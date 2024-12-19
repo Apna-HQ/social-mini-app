@@ -21,11 +21,18 @@ export default function Home() {
       if (!apna) {
         const { ApnaApp } = (await import('@apna/sdk'))
         apna = new ApnaApp({ appId: 'apna-nostr-mvp-1' });
+        // @ts-ignore
+        window.apna = apna;
       }   
       console.log('nostr.getProfile return value: ', await apna.nostr.getProfile())
 
-      // apna.nostr.subscribeToEvents([],(e: any) => {
-      //   setNotes((notes)=>[e,...notes])
+      // apna.nostr.subscribeToFeed("FOLLOWING_FEED",(e: any) => {
+      //   setNotes((notes)=>[...notes, e])
+      // })
+
+      // apna.nostr.subscribeToNotifications((e: any) => {
+      //   // setNotes((notes)=>[e,...notes])
+      //   console.log(`NOTIFICATION: ${e.content}`)
       // })
     }
     init()
@@ -39,6 +46,7 @@ export default function Home() {
       <button onClick={async () => {console.log(await apna.nostr.followNpub("npub1w46mjnagz9f0u556fzva8ypfftc5yfm32n8ygqmd2r32mxw4cfnsvkvy9e"));}}>nostr.followNpub()</button><br></br>
       <button onClick={async () => {console.log(await apna.nostr.unfollowNpub("npub1w46mjnagz9f0u556fzva8ypfftc5yfm32n8ygqmd2r32mxw4cfnsvkvy9e"));}}>nostr.unfollowNpub()</button><br></br>
       <button onClick={async () => {console.log(await apna.nostr.publishNote(`Hello World ${Date.now()}`));}}>nostr.publishNote()</button><br></br>
+      <button onClick={async () => {setNotes([]);await apna.nostr.subscribeToFeed('FOLLOWING_FEED', (e: any) => {setNotes((notes)=>[...notes, e])});}}>nostr.subscribeToFeed()</button><br></br>
       
       {notes.map((note, index) => (
         <div key={index} style={{ border: "solid 1px" }}>
