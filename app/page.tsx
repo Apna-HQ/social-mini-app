@@ -46,6 +46,9 @@ export default function Home() {
       <button onClick={async () => {console.log(await apna.nostr.followNpub("npub1w46mjnagz9f0u556fzva8ypfftc5yfm32n8ygqmd2r32mxw4cfnsvkvy9e"));}}>nostr.followNpub()</button><br></br>
       <button onClick={async () => {console.log(await apna.nostr.unfollowNpub("npub1w46mjnagz9f0u556fzva8ypfftc5yfm32n8ygqmd2r32mxw4cfnsvkvy9e"));}}>nostr.unfollowNpub()</button><br></br>
       <button onClick={async () => {console.log(await apna.nostr.publishNote(`Hello World ${Date.now()}`));}}>nostr.publishNote()</button><br></br>
+      <button onClick={async () => {console.log(await apna.nostr.likeNote(`note187j8dxwta5zvxle446uqutxue764q79vxmtv85dw7fnujlqgdm2qm7kelc`));}}>nostr.likeNote()</button><br></br>
+      <button onClick={async () => {console.log(await apna.nostr.repostNote(`note187j8dxwta5zvxle446uqutxue764q79vxmtv85dw7fnujlqgdm2qm7kelc`, 'test quote'));}}>nostr.repostNote()</button><br></br>
+      <button onClick={async () => {console.log(await apna.nostr.replyToNote(`note187j8dxwta5zvxle446uqutxue764q79vxmtv85dw7fnujlqgdm2qm7kelc`, `test reply ${Date.now()}`));}}>nostr.replyToNote()</button><br></br>
       <button onClick={async () => {setNotes([]);await apna.nostr.subscribeToFeed('FOLLOWING_FEED', (e: any) => {setNotes((notes)=>[...notes, e])});}}>nostr.subscribeToFeed()</button><br></br>
       
       {notes.map((note, index) => (
