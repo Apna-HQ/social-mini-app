@@ -41,7 +41,16 @@ export default function Home() {
   return (
     <main>
       <h1>Social</h1>
-      <button onClick={async () => {console.log(await apna.nostr.getProfile());}}>nostr.getProfile()</button><br></br>
+      <button onClick={async () => {
+          const profile = await apna.nostr.getProfile();
+          document.getElementById("profile")!.innerText = JSON.stringify(
+            profile,
+            undefined,
+            2
+          );
+          console.log(profile);
+        }}>nostr.getProfile()</button><br></br>
+      <pre id="profile"></pre>
       <button onClick={async () => {const oldProfile = await apna.nostr.getProfile();oldProfile.metadata.about = `Bitcoin Enthusiast ${Date.now()}`;console.log(await apna.nostr.updateProfile(oldProfile));}}>nostr.updateProfile()</button><br></br>
       <button onClick={async () => {console.log(await apna.nostr.followNpub("npub1w46mjnagz9f0u556fzva8ypfftc5yfm32n8ygqmd2r32mxw4cfnsvkvy9e"));}}>nostr.followNpub()</button><br></br>
       <button onClick={async () => {console.log(await apna.nostr.unfollowNpub("npub1w46mjnagz9f0u556fzva8ypfftc5yfm32n8ygqmd2r32mxw4cfnsvkvy9e"));}}>nostr.unfollowNpub()</button><br></br>
