@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@apna/sdk": "^0.1.17",
+    "@apna/sdk": "^0.1.18",
     "next": "14.2.6",
     "react": "^18",
     "react-dom": "^18"
