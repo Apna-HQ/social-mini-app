@@ -21,6 +21,8 @@ interface AppContextType {
   notes: any[]
   profile: Profile | null
   loading: boolean
+  loadingMore: boolean
+  loadMore: () => Promise<void>
   publishNote: (content: string) => Promise<void>
   likeNote: (id: string) => Promise<void>
   repostNote: (id: string) => Promise<void>
@@ -35,60 +37,65 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [notes, setNotes] = useState<any[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [lastTimestamp, setLastTimestamp] = useState<number | null>(null)
 
-  useEffect(() => {
-    const init = async () => {
-      if (!apna) {
-        const { ApnaApp } = (await import('@apna/sdk'))
-        apna = new ApnaApp({ appId: 'apna-nostr-mvp-1' })
-        // @ts-ignore
-        window.apna = apna
-      }
-
-      try {
-        // Get profile
-        const userProfile = await apna.nostr.getActiveUserProfile()
-        if (userProfile) {
-          setProfile({
-            metadata: userProfile.metadata,
-            pubkey: userProfile.nprofile.split(':')[1], // Extract pubkey from nprofile
-            stats: {
-              posts: 0 // Will be updated as we receive notes
-            }
-          })
-        }
-
-        // Subscribe to feed
-        await apna.nostr.subscribeToFeed('FOLLOWING_FEED', (e: any) => {
-          setNotes(prevNotes => {
-            // Sort by timestamp in descending order (newest first)
-            const newNotes = [...prevNotes, e].sort((a, b) => b.created_at - a.created_at)
-            
-            // Update post count in profile stats if it's the user's post
-            if (profile && e.pubkey === profile.pubkey) {
-              setProfile(prev => {
-                if (!prev) return null
-                return {
-                  ...prev,
-                  stats: {
-                    ...prev.stats,
-                    posts: newNotes.filter(note => note.pubkey === profile.pubkey).length
-                  }
-                }
-              })
-            }
-            
-            return newNotes
-          })
-        })
-      } catch (error) {
-        console.error("Failed to initialize:", error)
-      } finally {
-        setLoading(false)
-      }
+  const fetchInitialFeed = async () => {
+    if (!apna) {
+      const { ApnaApp } = (await import('@apna/sdk'))
+      apna = new ApnaApp({ appId: 'apna-nostr-mvp-1' })
+      // @ts-ignore
+      window.apna = apna
     }
 
-    init()
+    try {
+      // Get profile
+      const userProfile = await apna.nostr.getActiveUserProfile()
+      if (userProfile) {
+        setProfile({
+          metadata: userProfile.metadata,
+          pubkey: userProfile.nprofile.split(':')[1], // Extract pubkey from nprofile
+          stats: {
+            posts: 0
+          }
+        })
+      }
+
+      // Fetch initial feed
+      const initialNotes = await apna.nostr.fetchFeed('FOLLOWING_FEED', undefined, undefined, 20)
+      if (initialNotes.length > 0) {
+        setNotes(initialNotes.sort((a, b) => b.created_at - a.created_at))
+        setLastTimestamp(initialNotes[initialNotes.length - 1].created_at)
+      }
+    } catch (error) {
+      console.error("Failed to initialize:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadMore = async () => {
+    if (loadingMore || !lastTimestamp) return
+    
+    setLoadingMore(true)
+    try {
+      const olderNotes = await apna.nostr.fetchFeed('FOLLOWING_FEED', undefined, lastTimestamp, 20)
+      if (olderNotes.length > 0) {
+        setNotes(prevNotes => {
+          const newNotes = [...prevNotes, ...olderNotes].sort((a, b) => b.created_at - a.created_at)
+          return newNotes
+        })
+        setLastTimestamp(olderNotes[olderNotes.length - 1].created_at)
+      }
+    } catch (error) {
+      console.error("Failed to load more notes:", error)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchInitialFeed()
   }, [])
 
   const publishNote = async (content: string) => {
@@ -129,10 +136,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ 
-      notes, 
-      profile, 
-      loading, 
+    <AppContext.Provider value={{
+      notes,
+      profile,
+      loading,
+      loadingMore,
+      loadMore,
       publishNote,
       likeNote,
       repostNote,

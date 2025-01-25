@@ -2,9 +2,28 @@
 import { useApp } from "./providers"
 import { Post } from "@/components/ui/post"
 import { Fab } from "@/components/ui/fab"
+import { useEffect, useRef, useCallback } from "react"
 
 export default function Home() {
-  const { notes, publishNote, likeNote, repostNote, replyToNote } = useApp()
+  const { notes, loadingMore, loadMore, publishNote, likeNote, repostNote, replyToNote } = useApp()
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  const handleScroll = useCallback(() => {
+    if (!bottomRef.current || loadingMore) return
+
+    const bottomElement = bottomRef.current
+    const rect = bottomElement.getBoundingClientRect()
+    const isVisible = rect.top <= window.innerHeight
+
+    if (isVisible) {
+      loadMore()
+    }
+  }, [loadMore, loadingMore])
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [handleScroll])
 
   return (
     <main className="min-h-screen bg-background">
@@ -31,6 +50,14 @@ export default function Home() {
               No posts yet. Follow some users to see their posts here!
             </div>
           )}
+          {/* Loading indicator */}
+          {loadingMore && (
+            <div className="text-center py-4 text-muted-foreground">
+              Loading more posts...
+            </div>
+          )}
+          {/* Bottom detector */}
+          <div ref={bottomRef} className="h-4" />
         </div>
       </div>
 
