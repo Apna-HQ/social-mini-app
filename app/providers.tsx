@@ -1,5 +1,5 @@
 "use client"
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { ApnaApp } from "@apna/sdk"
 
 interface Profile {
@@ -27,11 +27,15 @@ interface AppContextType {
   likeNote: (id: string) => Promise<void>
   repostNote: (id: string) => Promise<void>
   replyToNote: (id: string, content: string) => Promise<void>
+  saveScrollPosition: (position: number) => void
+  savedScrollPosition: number | null
 }
 
 const AppContext = createContext<AppContextType | null>(null)
 
 let apna: ApnaApp
+
+const SCROLL_POSITION_KEY = 'feed-scroll-position'
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [notes, setNotes] = useState<any[]>([])
@@ -39,6 +43,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [lastTimestamp, setLastTimestamp] = useState<number | null>(null)
+  const [savedScrollPosition, setSavedScrollPosition] = useState<number | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(SCROLL_POSITION_KEY)
+      return saved ? Number(saved) : null
+    }
+    return null
+  })
+
+  const saveScrollPosition = useCallback((position: number) => {
+    setSavedScrollPosition(position)
+    localStorage.setItem(SCROLL_POSITION_KEY, position.toString())
+  }, [])
+
+  // Save scroll position when component unmounts (tab switch or app close)
+  useEffect(() => {
+    return () => {
+      const currentScroll = window.scrollY
+      localStorage.setItem(SCROLL_POSITION_KEY, currentScroll.toString())
+    }
+  }, [])
 
   const fetchInitialFeed = async () => {
     try {
@@ -248,7 +272,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       publishNote,
       likeNote,
       repostNote,
-      replyToNote
+      replyToNote,
+      saveScrollPosition,
+      savedScrollPosition
     }}>
       {children}
     </AppContext.Provider>

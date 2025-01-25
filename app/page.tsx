@@ -5,8 +5,9 @@ import { Fab } from "@/components/ui/fab"
 import { useEffect, useRef, useCallback } from "react"
 
 export default function Home() {
-  const { notes, loadingMore, loadMore, publishNote, likeNote, repostNote, replyToNote } = useApp()
+  const { notes, loadingMore, loadMore, publishNote, likeNote, repostNote, replyToNote, saveScrollPosition, savedScrollPosition } = useApp()
   const bottomRef = useRef<HTMLDivElement>(null)
+  const isRestoringScroll = useRef(false)
 
   const handleScroll = useCallback(() => {
     if (!bottomRef.current || loadingMore) return
@@ -15,10 +16,27 @@ export default function Home() {
     const rect = bottomElement.getBoundingClientRect()
     const isVisible = rect.top <= window.innerHeight
 
+    // Save scroll position if we're not in the process of restoring it
+    if (!isRestoringScroll.current) {
+      saveScrollPosition(window.scrollY)
+    }
+
     if (isVisible) {
       loadMore()
     }
-  }, [loadMore, loadingMore])
+  }, [loadMore, loadingMore, saveScrollPosition])
+
+  // Restore scroll position when component mounts or notes change
+  useEffect(() => {
+    if (savedScrollPosition !== null && notes.length > 0 && !isRestoringScroll.current) {
+      isRestoringScroll.current = true
+      window.scrollTo(0, savedScrollPosition)
+      // Reset the flag after a short delay to allow for normal scrolling
+      setTimeout(() => {
+        isRestoringScroll.current = false
+      }, 100)
+    }
+  }, [savedScrollPosition, notes])
 
   useEffect(() => {
     window.addEventListener('scroll', handleScroll)
