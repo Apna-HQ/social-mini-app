@@ -6,10 +6,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useEffect, useState } from "react"
 
 export default function ProfilePage() {
-  const { profile } = useApp()
+  const { profile, updateProfileMetadata } = useApp()
   const [userNotes, setUserNotes] = useState<any[]>([])
   const [userMetadata, setUserMetadata] = useState<Record<string, any>>({})
   const [loadingNotes, setLoadingNotes] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editForm, setEditForm] = useState({
+    name: '',
+    about: ''
+  })
 
   useEffect(() => {
     if (profile) {
@@ -65,19 +70,95 @@ export default function ProfilePage() {
       <div className="container max-w-screen-md py-4">
         {/* Profile Header */}
         <div className="mb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-20 h-20 rounded-full bg-accent flex items-center justify-center text-2xl font-bold">
-              {profile.metadata.name?.[0] || "U"}
+          {isEditing ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 rounded-full bg-accent flex items-center justify-center text-2xl font-bold">
+                  {editForm.name?.[0] || profile.metadata.name?.[0] || "U"}
+                </div>
+                <div className="flex-1">
+                  <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Your name"
+                    className="w-full px-3 py-2 border rounded-md bg-background"
+                  />
+                  <p className="text-sm text-muted-foreground break-all mt-1">{profile.pubkey}</p>
+                </div>
+              </div>
+              
+              <div>
+                <textarea
+                  value={editForm.about}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, about: e.target.value }))}
+                  placeholder="About you"
+                  className="w-full px-3 py-2 border rounded-md bg-background resize-none h-24"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      await updateProfileMetadata({
+                        name: editForm.name,
+                        about: editForm.about
+                      });
+                      setIsEditing(false);
+                    } catch (error) {
+                      console.error("Failed to update profile:", error);
+                    }
+                  }}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditForm({
+                      name: profile.metadata.name || '',
+                      about: profile.metadata.about || ''
+                    });
+                  }}
+                  className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold">{profile.metadata.name || "Unknown"}</h1>
-              <p className="text-sm text-muted-foreground break-all">{profile.pubkey}</p>
-            </div>
-          </div>
-          
-          {/* Bio */}
-          {profile.metadata.about && (
-            <p className="mt-4 text-muted-foreground">{profile.metadata.about}</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 rounded-full bg-accent flex items-center justify-center text-2xl font-bold">
+                  {profile.metadata.name?.[0] || "U"}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <h1 className="text-2xl font-bold">{profile.metadata.name || "Unknown"}</h1>
+                    <button
+                      onClick={() => {
+                        setEditForm({
+                          name: profile.metadata.name || '',
+                          about: profile.metadata.about || ''
+                        });
+                        setIsEditing(true);
+                      }}
+                      className="px-3 py-1 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90"
+                    >
+                      Edit Profile
+                    </button>
+                  </div>
+                  <p className="text-sm text-muted-foreground break-all">{profile.pubkey}</p>
+                </div>
+              </div>
+              
+              {/* Bio */}
+              {profile.metadata.about && (
+                <p className="mt-4 text-muted-foreground">{profile.metadata.about}</p>
+              )}
+            </>
           )}
 
           {/* Stats */}

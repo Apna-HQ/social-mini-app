@@ -41,6 +41,7 @@ interface AppContextType {
   repostNote: (id: string) => Promise<void>
   replyToNote: (id: string, content: string) => Promise<void>
   fetchNoteAndReplies: (id: string) => Promise<any>
+  updateProfileMetadata: (metadata: { name?: string, about?: string }) => Promise<void>
   saveScrollPosition: (position: number) => void
   savedScrollPosition: number | null
 }
@@ -310,6 +311,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const updateProfileMetadata = async (metadata: { name?: string, about?: string }) => {
+    try {
+      await ensureApnaInitialized()
+      const result = await apna.nostr.updateProfileMetadata(metadata)
+      if (result) {
+        setProfile({
+          ...profile!,
+          metadata: result.metadata
+        })
+      }
+    } catch (error) {
+      console.error("Failed to update profile metadata:", error)
+      throw error
+    }
+  }
+
   const fetchNoteAndReplies = async (id: string) => {
     try {
       await ensureApnaInitialized()
@@ -335,6 +352,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       repostNote,
       replyToNote,
       fetchNoteAndReplies,
+      updateProfileMetadata,
       saveScrollPosition,
       savedScrollPosition
     }}>
