@@ -5,17 +5,10 @@ import { Post } from "@/components/ui/post"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useEffect, useState } from "react"
 
-interface ProfileStats {
-  followers: number
-  following: number
-}
-
 export default function ProfilePage() {
   const { profile, notes } = useApp()
-  const [stats, setStats] = useState<ProfileStats>({ followers: 0, following: 0 })
   const [userNotes, setUserNotes] = useState<any[]>([])
-  const [followers, setFollowers] = useState<any[]>([])
-  const [following, setFollowing] = useState<any[]>([])
+  const [userMetadata, setUserMetadata] = useState<Record<string, any>>({})
 
   useEffect(() => {
     if (profile) {
@@ -23,12 +16,27 @@ export default function ProfilePage() {
       const filteredNotes = notes.filter(note => note.pubkey === profile.pubkey)
       setUserNotes(filteredNotes)
 
-      // TODO: Fetch actual followers/following from nostr network
-      // For now using placeholder data
-      setStats({
-        followers: Math.floor(Math.random() * 100),
-        following: Math.floor(Math.random() * 100)
-      })
+      // Fetch metadata for followers and following
+      const fetchUserMetadata = async () => {
+        const metadata: Record<string, any> = {}
+        const allUsers = Array.from(new Set([...profile.followers, ...profile.following]))
+
+        await Promise.all(
+          allUsers.map(async (pubkey) => {
+            try {
+              // @ts-ignore
+              const userMetadata = await window.apna.nostr.fetchUserMetadata(pubkey)
+              metadata[pubkey] = userMetadata
+            } catch (error) {
+              console.error(`Failed to fetch metadata for ${pubkey}:`, error)
+            }
+          })
+        )
+
+        setUserMetadata(metadata)
+      }
+
+      fetchUserMetadata()
     }
   }, [profile, notes])
 
@@ -71,11 +79,11 @@ export default function ProfilePage() {
               <span className="text-muted-foreground ml-1">Notes</span>
             </div>
             <div>
-              <span className="font-bold">{stats.followers}</span>
+              <span className="font-bold">{profile.followers.length}</span>
               <span className="text-muted-foreground ml-1">Followers</span>
             </div>
             <div>
-              <span className="font-bold">{stats.following}</span>
+              <span className="font-bold">{profile.following.length}</span>
               <span className="text-muted-foreground ml-1">Following</span>
             </div>
           </div>
@@ -111,16 +119,44 @@ export default function ProfilePage() {
             )}
           </TabsContent>
 
-          <TabsContent value="followers" className="mt-4">
-            <div className="text-center py-8 text-muted-foreground">
-              Followers list coming soon
-            </div>
+          <TabsContent value="followers" className="mt-4 space-y-4">
+            {profile.followers.length > 0 ? (
+              profile.followers.map((pubkey) => (
+                <div key={pubkey} className="flex items-center gap-4 p-4 rounded-lg border">
+                  <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-lg font-bold">
+                    {(userMetadata[pubkey]?.name?.[0] || pubkey.slice(0, 1)).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{userMetadata[pubkey]?.name || pubkey.slice(0, 8)}</p>
+                    <p className="text-sm text-muted-foreground truncate">{userMetadata[pubkey]?.about || pubkey}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No followers yet
+              </div>
+            )}
           </TabsContent>
 
-          <TabsContent value="following" className="mt-4">
-            <div className="text-center py-8 text-muted-foreground">
-              Following list coming soon
-            </div>
+          <TabsContent value="following" className="mt-4 space-y-4">
+            {profile.following.length > 0 ? (
+              profile.following.map((pubkey) => (
+                <div key={pubkey} className="flex items-center gap-4 p-4 rounded-lg border">
+                  <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-lg font-bold">
+                    {(userMetadata[pubkey]?.name?.[0] || pubkey.slice(0, 1)).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{userMetadata[pubkey]?.name || pubkey.slice(0, 8)}</p>
+                    <p className="text-sm text-muted-foreground truncate">{userMetadata[pubkey]?.about || pubkey}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Not following anyone yet
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

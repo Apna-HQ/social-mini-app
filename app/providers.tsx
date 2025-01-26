@@ -15,6 +15,8 @@ interface Profile {
     posts: number
   }
   pubkey: string
+  followers: string[]
+  following: string[]
 }
 
 interface AppContextType {
@@ -96,7 +98,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           pubkey: userProfile.nprofile.split(':')[1],
           stats: {
             posts: 0
-          }
+          },
+          followers: userProfile.followers || [],
+          following: userProfile.following || []
         })
       }
 
