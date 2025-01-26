@@ -1,6 +1,15 @@
 "use client"
 import { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { ApnaApp } from "@apna/sdk"
+import { nip19 } from "nostr-tools"
+
+type DecodedNprofile = {
+  type: 'nprofile'
+  data: {
+    pubkey: string
+    relays?: string[]
+  }
+}
 
 interface Profile {
   metadata: {
@@ -95,7 +104,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (userProfile) {
         setProfile({
           metadata: userProfile.metadata,
-          pubkey: userProfile.nprofile.split(':')[1],
+          pubkey: (() => {
+            const decoded = nip19.decode(userProfile.nprofile) as DecodedNprofile
+            if (decoded.type === 'nprofile' && decoded.data.pubkey) {
+              // Encode the pubkey as npub and then decode it to get the hex string
+              const npub = nip19.npubEncode(decoded.data.pubkey)
+              return nip19.decode(npub).data as string
+            }
+            throw new Error('Invalid nprofile format')
+          })(),
           stats: {
             posts: 0
           },

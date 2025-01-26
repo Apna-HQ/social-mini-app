@@ -6,18 +6,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useEffect, useState } from "react"
 
 export default function ProfilePage() {
-  const { profile, notes } = useApp()
+  const { profile } = useApp()
   const [userNotes, setUserNotes] = useState<any[]>([])
   const [userMetadata, setUserMetadata] = useState<Record<string, any>>({})
+  const [loadingNotes, setLoadingNotes] = useState(true)
 
   useEffect(() => {
     if (profile) {
-      // Filter notes by the user's pubkey
-      const filteredNotes = notes.filter(note => note.pubkey === profile.pubkey)
-      setUserNotes(filteredNotes)
+      const fetchData = async () => {
+        try {
+          // Fetch user's notes using NOTES_FEED
+          // @ts-ignore
+          const notes = await window.apna.nostr.fetchUserFeed(profile.pubkey, 'NOTES_FEED', undefined, undefined, 20)
+          setUserNotes(notes)
+        } catch (error) {
+          console.error("Failed to fetch user notes:", error)
+        } finally {
+          setLoadingNotes(false)
+        }
 
-      // Fetch metadata for followers and following
-      const fetchUserMetadata = async () => {
+        // Fetch metadata for followers and following
         const metadata: Record<string, any> = {}
         const allUsers = Array.from(new Set([...profile.followers, ...profile.following]))
 
@@ -36,9 +44,9 @@ export default function ProfilePage() {
         setUserMetadata(metadata)
       }
 
-      fetchUserMetadata()
+      fetchData()
     }
-  }, [profile, notes])
+  }, [profile])
 
   if (!profile) {
     return (
@@ -98,7 +106,11 @@ export default function ProfilePage() {
           </TabsList>
 
           <TabsContent value="notes" className="mt-4 space-y-4">
-            {userNotes.length > 0 ? (
+            {loadingNotes ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Loading notes...
+              </div>
+            ) : userNotes.length > 0 ? (
               userNotes.map((note) => (
                 <Post
                   key={note.id}
