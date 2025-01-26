@@ -13,7 +13,15 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
   const { profile } = useApp()
   const [userNotes, setUserNotes] = useState<any[]>([])
   const [loadingNotes, setLoadingNotes] = useState(true)
-  const [userProfile, setUserProfile] = useState<any>(null)
+  const [userProfile, setUserProfile] = useState<{
+    metadata: {
+      name?: string;
+      about?: string;
+      picture?: string;
+    };
+    followers: string[];
+    following: string[];
+  } | null>(null)
   const [userMetadata, setUserMetadata] = useState<Record<string, any>>({})
 
   useEffect(() => {
