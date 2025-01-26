@@ -22,7 +22,9 @@ interface AppContextType {
   profile: Profile | null
   loading: boolean
   loadingMore: boolean
+  refreshing: boolean
   loadMore: () => Promise<void>
+  refreshFeed: () => Promise<void>
   publishNote: (content: string) => Promise<void>
   likeNote: (id: string) => Promise<void>
   repostNote: (id: string) => Promise<void>
@@ -42,6 +44,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [lastTimestamp, setLastTimestamp] = useState<number | null>(null)
   const [savedScrollPosition, setSavedScrollPosition] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {
@@ -139,6 +142,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       console.error("Failed to initialize:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const refreshFeed = async () => {
+    if (refreshing) return
+    
+    setRefreshing(true)
+    try {
+      const { feedDB } = await import('@/lib/feedDB')
+      
+      // Get latest timestamp from cache
+      const timestamp = await feedDB.getLatestTimestamp()
+      
+      // Fetch fresh notes
+      const freshNotes = await apna.nostr.fetchFeed(
+        'FOLLOWING_FEED',
+        timestamp || undefined,
+        undefined,
+        20
+      )
+
+      if (freshNotes.length > 0) {
+        await feedDB.addNotes(freshNotes)
+        
+        // Update state with deduplication
+        setNotes(prev => {
+          const seenIds = new Set(prev.map(note => note.id))
+          const uniqueNewNotes = freshNotes.filter(note => !seenIds.has(note.id))
+          return [...uniqueNewNotes, ...prev].sort((a, b) => b.created_at - a.created_at)
+        })
+      }
+    } catch (error) {
+      console.error("Failed to refresh feed:", error)
+    } finally {
+      setRefreshing(false)
     }
   }
 
@@ -268,7 +306,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       profile,
       loading,
       loadingMore,
+      refreshing,
       loadMore,
+      refreshFeed,
       publishNote,
       likeNote,
       repostNote,
