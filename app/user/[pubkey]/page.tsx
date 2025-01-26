@@ -95,7 +95,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
                 </div>
                 {profile && profile.pubkey !== params.pubkey && (
                   <Button
-                    variant={profile.following.includes(params.pubkey) ? "destructive" : "default"}
+                    variant={profile.following.includes(params.pubkey) ? "outline" : "default"}
                     onClick={async () => {
                       try {
                         if (profile.following.includes(params.pubkey)) {
