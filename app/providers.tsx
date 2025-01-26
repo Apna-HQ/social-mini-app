@@ -29,6 +29,7 @@ interface AppContextType {
   likeNote: (id: string) => Promise<void>
   repostNote: (id: string) => Promise<void>
   replyToNote: (id: string, content: string) => Promise<void>
+  fetchNoteAndReplies: (id: string) => Promise<any>
   saveScrollPosition: (position: number) => void
   savedScrollPosition: number | null
 }
@@ -38,6 +39,16 @@ const AppContext = createContext<AppContextType | null>(null)
 let apna: ApnaApp
 
 const SCROLL_POSITION_KEY = 'feed-scroll-position'
+
+const ensureApnaInitialized = async () => {
+  if (!apna) {
+    const { ApnaApp } = (await import('@apna/sdk'))
+    apna = new ApnaApp({ appId: 'apna-nostr-mvp-1' })
+    // @ts-ignore
+    window.apna = apna
+  }
+  return apna
+}
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [notes, setNotes] = useState<any[]>([])
@@ -59,7 +70,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(SCROLL_POSITION_KEY, position.toString())
   }, [])
 
-  // Save scroll position when component unmounts (tab switch or app close)
   useEffect(() => {
     return () => {
       const currentScroll = window.scrollY
@@ -69,25 +79,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const fetchInitialFeed = async () => {
     try {
-      // First try to load cached notes before anything else
       const { feedDB, INITIAL_FETCH_SIZE } = await import('@/lib/feedDB')
       const cachedNotes = await feedDB.getNotes(INITIAL_FETCH_SIZE)
       
       if (cachedNotes.length > 0) {
         setNotes(cachedNotes)
         setLastTimestamp(cachedNotes[cachedNotes.length - 1].created_at)
-        setLoading(false) // Show cached content immediately
+        setLoading(false)
       }
 
-      // Initialize apna in parallel
-      if (!apna) {
-        const { ApnaApp } = (await import('@apna/sdk'))
-        apna = new ApnaApp({ appId: 'apna-nostr-mvp-1' })
-        // @ts-ignore
-        window.apna = apna
-      }
-
-      // Get profile
+      await ensureApnaInitialized()
       const userProfile = await apna.nostr.getActiveUserProfile()
       if (userProfile) {
         setProfile({
@@ -99,10 +100,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         })
       }
 
-      // Determine fetch size based on cache state
       const fetchSize = cachedNotes.length === 0 ? INITIAL_FETCH_SIZE : 20
 
-      // Fetch fresh notes
       let latestTimestamp: number | undefined = undefined
       if (cachedNotes.length > 0) {
         const timestamp = await feedDB.getLatestTimestamp()
@@ -121,20 +120,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (freshNotes.length > 0) {
         await feedDB.addNotes(freshNotes)
         
-        // Update state with deduplication
         setNotes(prev => {
           const seenIds = new Set(prev.map(note => note.id))
           const uniqueNewNotes = freshNotes.filter(note => !seenIds.has(note.id))
           return [...uniqueNewNotes, ...prev].sort((a, b) => b.created_at - a.created_at)
         })
 
-        // Update timestamp only if we got new items
         if (freshNotes[freshNotes.length - 1].created_at < (lastTimestamp || Infinity)) {
           setLastTimestamp(freshNotes[freshNotes.length - 1].created_at)
         }
       }
 
-      // If we had no cached notes and now have fresh notes, remove loading state
       if (cachedNotes.length === 0) {
         setLoading(false)
       }
@@ -152,10 +148,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const { feedDB } = await import('@/lib/feedDB')
       
-      // Get latest timestamp from cache
       const timestamp = await feedDB.getLatestTimestamp()
       
-      // Fetch fresh notes
       const freshNotes = await apna.nostr.fetchFeed(
         'FOLLOWING_FEED',
         timestamp || undefined,
@@ -166,7 +160,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (freshNotes.length > 0) {
         await feedDB.addNotes(freshNotes)
         
-        // Update state with deduplication
         setNotes(prev => {
           const seenIds = new Set(prev.map(note => note.id))
           const uniqueNewNotes = freshNotes.filter(note => !seenIds.has(note.id))
@@ -187,12 +180,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       const { feedDB } = await import('@/lib/feedDB')
       
-      // Keep track of note IDs we've already seen
       const seenNoteIds = new Set(notes.map(note => note.id))
       
       const { LOAD_MORE_SIZE } = await import('@/lib/feedDB')
       
-      // First try to get cached older notes
       const cachedOlderNotes = await feedDB.getNotes(LOAD_MORE_SIZE, lastTimestamp)
       const uniqueCachedNotes = cachedOlderNotes.filter(note => !seenNoteIds.has(note.id))
       
@@ -205,7 +196,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setLastTimestamp(uniqueCachedNotes[uniqueCachedNotes.length - 1].created_at)
       }
       
-      // Then fetch from network if we need more notes
       if (uniqueCachedNotes.length < LOAD_MORE_SIZE) {
         const olderNotes = await apna.nostr.fetchFeed(
           'FOLLOWING_FEED',
@@ -216,7 +206,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const uniqueNetworkNotes = olderNotes.filter(note => !seenNoteIds.has(note.id))
         
         if (uniqueNetworkNotes.length > 0) {
-          // Store in cache for future loads
           await feedDB.addNotes(uniqueNetworkNotes)
           
           setNotes(prevNotes => {
@@ -240,8 +229,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const publishNote = async (content: string) => {
     if (!content.trim()) return
     try {
+      await ensureApnaInitialized()
       const result = await apna.nostr.publishNote(content)
-      // Add the new note to IndexedDB and state
       if (result) {
         const { feedDB } = await import('@/lib/feedDB')
         await feedDB.addNotes([result])
@@ -255,8 +244,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const likeNote = async (id: string) => {
     try {
+      await ensureApnaInitialized()
       const result = await apna.nostr.likeNote(id)
-      // Optionally update local state if the API returns updated note data
       if (result) {
         const { feedDB } = await import('@/lib/feedDB')
         await feedDB.addNotes([result])
@@ -272,8 +261,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const repostNote = async (id: string) => {
     try {
+      await ensureApnaInitialized()
       const result = await apna.nostr.repostNote(id, '')
-      // Add the repost to IndexedDB and state if returned
       if (result) {
         const { feedDB } = await import('@/lib/feedDB')
         await feedDB.addNotes([result])
@@ -287,8 +276,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const replyToNote = async (id: string, content: string) => {
     try {
+      await ensureApnaInitialized()
       const result = await apna.nostr.replyToNote(id, content)
-      // Add the reply to IndexedDB and state if returned
       if (result) {
         const { feedDB } = await import('@/lib/feedDB')
         await feedDB.addNotes([result])
@@ -296,6 +285,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error("Failed to reply to note:", error)
+      throw error
+    }
+  }
+
+  const fetchNoteAndReplies = async (id: string) => {
+    try {
+      await ensureApnaInitialized()
+      const result = await apna.nostr.fetchNoteAndReplies(id)
+      return result
+    } catch (error) {
+      console.error("Failed to fetch note and replies:", error)
       throw error
     }
   }
@@ -313,6 +313,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       likeNote,
       repostNote,
       replyToNote,
+      fetchNoteAndReplies,
       saveScrollPosition,
       savedScrollPosition
     }}>

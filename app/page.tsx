@@ -3,8 +3,10 @@ import { useApp } from "./providers"
 import { Post } from "@/components/ui/post"
 import { Fab } from "@/components/ui/fab"
 import { useEffect, useRef, useCallback } from "react"
+import { useRouter } from "next/navigation"
 
 export default function Home() {
+  const router = useRouter()
   const { notes, loadingMore, refreshing, loadMore, refreshFeed, publishNote, likeNote, repostNote, replyToNote, saveScrollPosition, savedScrollPosition } = useApp()
   const bottomRef = useRef<HTMLDivElement>(null)
   const isRestoringScroll = useRef(false)
@@ -116,6 +118,7 @@ export default function Home() {
           {notes.map((note) => (
             <Post
               key={note.id}
+              id={note.id}
               content={note.content}
               author={{
                 name: note.pubkey.slice(0, 8),
@@ -125,7 +128,7 @@ export default function Home() {
               timestamp={note.created_at}
               onLike={() => likeNote(note.id)}
               onRepost={() => repostNote(note.id)}
-              onReply={() => replyToNote(note.id, `Reply to ${note.content.slice(0, 10)}...`)}
+              onReply={() => router.push(`/note/${note.id}`)}
             />
           ))}
           {notes.length === 0 && (

@@ -1,15 +1,8 @@
-import './globals.css'
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import { BottomNav } from '@/components/ui/bottom-nav'
-import { AppProvider } from './providers'
+"use client"
 
-const inter = Inter({ subsets: ['latin'] })
-
-export const metadata: Metadata = {
-  title: 'Social Mini App',
-  description: 'A modern social media experience',
-}
+import { AppProvider } from "./providers"
+import { Nav } from "@/components/ui/nav"
+import "./globals.css"
 
 export default function RootLayout({
   children,
@@ -18,12 +11,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body>
         <AppProvider>
-          <div className="pb-16">
-            {children}
-          </div>
-          <BottomNav />
+          {children}
+          <Nav />
+          {/* Add padding to account for fixed nav */}
+          <div className="pb-16" />
         </AppProvider>
       </body>
     </html>

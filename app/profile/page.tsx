@@ -1,95 +1,129 @@
 "use client"
+
 import { useApp } from "../providers"
-import Image from "next/image"
+import { Post } from "@/components/ui/post"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useEffect, useState } from "react"
+
+interface ProfileStats {
+  followers: number
+  following: number
+}
 
 export default function ProfilePage() {
-  const { profile, loading } = useApp()
+  const { profile, notes } = useApp()
+  const [stats, setStats] = useState<ProfileStats>({ followers: 0, following: 0 })
+  const [userNotes, setUserNotes] = useState<any[]>([])
+  const [followers, setFollowers] = useState<any[]>([])
+  const [following, setFollowing] = useState<any[]>([])
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center space-y-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        <p className="text-muted-foreground">Loading profile data...</p>
-      </div>
-    )
-  }
+  useEffect(() => {
+    if (profile) {
+      // Filter notes by the user's pubkey
+      const filteredNotes = notes.filter(note => note.pubkey === profile.pubkey)
+      setUserNotes(filteredNotes)
+
+      // TODO: Fetch actual followers/following from nostr network
+      // For now using placeholder data
+      setStats({
+        followers: Math.floor(Math.random() * 100),
+        following: Math.floor(Math.random() * 100)
+      })
+    }
+  }, [profile, notes])
 
   if (!profile) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center space-y-4">
-        <p className="text-destructive">Failed to load profile data</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-colors"
-        >
-          Try Again
-        </button>
+      <div className="min-h-screen bg-background">
+        <div className="container max-w-screen-md py-4">
+          <div className="text-center py-8 text-muted-foreground">
+            Loading profile...
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="max-w-screen-md mx-auto">
-        {profile.metadata.banner && (
-          <div className="w-full h-48 relative">
-            <Image
-              src={profile.metadata.banner}
-              alt="Profile banner"
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 768px"
-            />
-          </div>
-        )}
-
-        <div className="p-6">
-          <div className="flex items-center space-x-4">
-            {profile.metadata.picture && (
-              <div className="relative w-24 h-24">
-                <Image
-                  src={profile.metadata.picture}
-                  alt={profile.metadata.name || 'Profile picture'}
-                  width={96}
-                  height={96}
-                  className="rounded-full border-4 border-background shadow-lg"
-                />
-              </div>
-            )}
-            
-            <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-bold truncate">
-                {profile.metadata.name || 'Anonymous'}
-              </h1>
-              {profile.metadata.nip05 && (
-                <p className="text-sm text-muted-foreground truncate">{profile.metadata.nip05}</p>
-              )}
+    <div className="min-h-screen bg-background">
+      <div className="container max-w-screen-md py-4">
+        {/* Profile Header */}
+        <div className="mb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-accent flex items-center justify-center text-2xl font-bold">
+              {profile.metadata.name?.[0] || "U"}
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold">{profile.metadata.name || "Unknown"}</h1>
+              <p className="text-sm text-muted-foreground break-all">{profile.pubkey}</p>
             </div>
           </div>
-
-          {/* Stats */}
-          <div className="flex gap-6 mt-6 pb-6 border-b">
-            <div className="text-center">
-              <p className="text-2xl font-bold">{profile.stats.posts}</p>
-              <p className="text-sm text-muted-foreground">Posts</p>
-            </div>
-          </div>
-
+          
+          {/* Bio */}
           {profile.metadata.about && (
-            <div className="mt-6">
-              <h2 className="text-lg font-semibold mb-2">About</h2>
-              <p className="text-muted-foreground whitespace-pre-wrap break-words">{profile.metadata.about}</p>
-            </div>
+            <p className="mt-4 text-muted-foreground">{profile.metadata.about}</p>
           )}
 
-          <div className="mt-6 pt-6 border-t">
-            <h2 className="text-lg font-semibold mb-2">Public Key</h2>
-            <p className="text-sm text-muted-foreground break-all font-mono bg-accent/50 p-3 rounded-lg">
-              {profile.pubkey}
-            </p>
+          {/* Stats */}
+          <div className="flex gap-6 mt-4">
+            <div>
+              <span className="font-bold">{userNotes.length}</span>
+              <span className="text-muted-foreground ml-1">Notes</span>
+            </div>
+            <div>
+              <span className="font-bold">{stats.followers}</span>
+              <span className="text-muted-foreground ml-1">Followers</span>
+            </div>
+            <div>
+              <span className="font-bold">{stats.following}</span>
+              <span className="text-muted-foreground ml-1">Following</span>
+            </div>
           </div>
         </div>
+
+        {/* Tabs */}
+        <Tabs defaultValue="notes">
+          <TabsList className="w-full">
+            <TabsTrigger value="notes" className="flex-1">Notes</TabsTrigger>
+            <TabsTrigger value="followers" className="flex-1">Followers</TabsTrigger>
+            <TabsTrigger value="following" className="flex-1">Following</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="notes" className="mt-4 space-y-4">
+            {userNotes.length > 0 ? (
+              userNotes.map((note) => (
+                <Post
+                  key={note.id}
+                  id={note.id}
+                  content={note.content}
+                  author={{
+                    name: profile.metadata.name || note.pubkey.slice(0, 8),
+                    picture: profile.metadata.picture,
+                    pubkey: note.pubkey
+                  }}
+                  timestamp={note.created_at}
+                />
+              ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No notes yet
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="followers" className="mt-4">
+            <div className="text-center py-8 text-muted-foreground">
+              Followers list coming soon
+            </div>
+          </TabsContent>
+
+          <TabsContent value="following" className="mt-4">
+            <div className="text-center py-8 text-muted-foreground">
+              Following list coming soon
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
-    </main>
+    </div>
   )
 }

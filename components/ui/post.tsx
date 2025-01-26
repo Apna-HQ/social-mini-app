@@ -17,7 +17,21 @@ interface PostProps {
   onReply?: () => void
 }
 
-export function Post({ content, author, timestamp, onLike, onRepost, onReply }: PostProps) {
+import { useRouter } from "next/navigation"
+
+export function Post({ content, author, timestamp, onLike, onRepost, onReply, id }: PostProps & { id?: string }) {
+  const router = useRouter()
+  
+  const handleClick = () => {
+    if (id) {
+      router.push(`/note/${id}`)
+    }
+  }
+
+  const handleAction = (e: React.MouseEvent, action?: () => void) => {
+    e.stopPropagation()
+    action?.()
+  }
   const [isExpanded, setIsExpanded] = useState(false)
   const shouldTruncate = content.length > 280
   
@@ -26,7 +40,10 @@ export function Post({ content, author, timestamp, onLike, onRepost, onReply }: 
   }
 
   return (
-    <Card className="mb-4 hover:bg-accent/5 transition-colors">
+    <Card
+      className="mb-4 hover:bg-accent/5 transition-colors cursor-pointer"
+      onClick={handleClick}
+    >
       <CardHeader className="flex flex-row items-start space-y-0 gap-3 pb-3">
         <Avatar>
           <AvatarImage src={author.picture || "https://www.kindpng.com/picc/m/252-2524695_dummy-profile-image-jpg-hd-png-download.png"} />
@@ -68,22 +85,22 @@ export function Post({ content, author, timestamp, onLike, onRepost, onReply }: 
       </CardContent>
       <CardFooter className="border-t pt-3">
         <div className="flex gap-6 text-muted-foreground">
-          <button 
-            onClick={onReply}
+          <button
+            onClick={(e) => handleAction(e, onReply)}
             className="flex items-center gap-1 hover:text-primary transition-colors"
           >
             <MessageCircle className="w-4 h-4" />
             <span className="text-sm">Reply</span>
           </button>
-          <button 
-            onClick={onRepost}
+          <button
+            onClick={(e) => handleAction(e, onRepost)}
             className="flex items-center gap-1 hover:text-green-500 transition-colors"
           >
             <Repeat2 className="w-4 h-4" />
             <span className="text-sm">Repost</span>
           </button>
-          <button 
-            onClick={onLike}
+          <button
+            onClick={(e) => handleAction(e, onLike)}
             className="flex items-center gap-1 hover:text-red-500 transition-colors"
           >
             <Heart className="w-4 h-4" />
