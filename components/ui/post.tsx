@@ -32,6 +32,12 @@ export function Post({ content, author, timestamp, onLike, onRepost, onReply, id
     e.stopPropagation()
     action?.()
   }
+
+  const handleUserClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push(`/user/${author.pubkey}`)
+  }
+
   const [isExpanded, setIsExpanded] = useState(false)
   const shouldTruncate = content.length > 280
   
@@ -45,13 +51,20 @@ export function Post({ content, author, timestamp, onLike, onRepost, onReply, id
       onClick={handleClick}
     >
       <CardHeader className="flex flex-row items-start space-y-0 gap-3 pb-3">
-        <Avatar>
-          <AvatarImage src={author.picture || "https://www.kindpng.com/picc/m/252-2524695_dummy-profile-image-jpg-hd-png-download.png"} />
-          <AvatarFallback>{author.name?.[0] || "U"}</AvatarFallback>
-        </Avatar>
+        <div onClick={handleUserClick} className="cursor-pointer hover:opacity-80">
+          <Avatar>
+            <AvatarImage src={author.picture || "https://www.kindpng.com/picc/m/252-2524695_dummy-profile-image-jpg-hd-png-download.png"} />
+            <AvatarFallback>{author.name?.[0] || "U"}</AvatarFallback>
+          </Avatar>
+        </div>
         <div className="flex-1 min-w-0"> {/* Add min-w-0 to enable text truncation */}
           <div className="flex items-center gap-2">
-            <span className="font-semibold truncate">{author.name || "Unknown"}</span>
+            <span
+              onClick={handleUserClick}
+              className="font-semibold truncate cursor-pointer hover:underline"
+            >
+              {author.name || "Unknown"}
+            </span>
             <span className="text-sm text-muted-foreground flex-shrink-0">·</span>
             <span className="text-sm text-muted-foreground flex-shrink-0">{formatDate(timestamp)}</span>
           </div>
