@@ -1,8 +1,8 @@
 "use client"
 import { useState } from "react"
 import { Card, CardContent, CardFooter, CardHeader } from "./card"
-import { Avatar, AvatarFallback, AvatarImage } from "./avatar"
 import { Heart, MessageCircle, Repeat2, ChevronDown, ChevronUp } from "lucide-react"
+import { AuthorInfo } from "./author-info"
 
 interface PostProps {
   content: string
@@ -40,36 +40,18 @@ export function Post({ content, author, timestamp, onLike, onRepost, onReply, id
 
   const [isExpanded, setIsExpanded] = useState(false)
   const shouldTruncate = content.length > 280
-  
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleString()
-  }
 
   return (
     <Card
       className="mb-4 hover:bg-accent/5 transition-colors cursor-pointer"
       onClick={handleClick}
     >
-      <CardHeader className="flex flex-row items-start space-y-0 gap-3 pb-3">
-        <div onClick={handleUserClick} className="cursor-pointer hover:opacity-80">
-          <Avatar>
-            <AvatarImage src={author.picture || "https://www.kindpng.com/picc/m/252-2524695_dummy-profile-image-jpg-hd-png-download.png"} />
-            <AvatarFallback>{author.name?.[0] || "U"}</AvatarFallback>
-          </Avatar>
-        </div>
-        <div className="flex-1 min-w-0"> {/* Add min-w-0 to enable text truncation */}
-          <div className="flex items-center gap-2">
-            <span
-              onClick={handleUserClick}
-              className="font-semibold truncate cursor-pointer hover:underline"
-            >
-              {author.name || "Unknown"}
-            </span>
-            <span className="text-sm text-muted-foreground flex-shrink-0">·</span>
-            <span className="text-sm text-muted-foreground flex-shrink-0">{formatDate(timestamp)}</span>
-          </div>
-          <span className="text-xs text-muted-foreground truncate block">{author.pubkey}</span>
-        </div>
+      <CardHeader className="pb-3">
+        <AuthorInfo
+          pubkey={author.pubkey}
+          onClick={handleUserClick}
+          timestamp={timestamp}
+        />
       </CardHeader>
       <CardContent className="pb-3">
         <div className="relative">
