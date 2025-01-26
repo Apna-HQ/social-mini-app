@@ -7,6 +7,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft } from "lucide-react"
+import { userProfileDB } from "@/lib/userProfileDB"
 
 export default function UserProfilePage({ params }: { params: { pubkey: string } }) {
   const router = useRouter()
@@ -23,23 +24,75 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
     following: string[];
   } | null>(null)
   const [userMetadata, setUserMetadata] = useState<Record<string, any>>({})
+  const [isStale, setIsStale] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch user profile
-        // @ts-ignore
-        const profile = await window.apna.nostr.fetchUserProfile(params.pubkey)
-        setUserProfile(profile)
+        // Check cache first
+        const cachedData = await userProfileDB.getProfile(params.pubkey)
+        
+        if (cachedData) {
+          // Use cached data immediately
+          setUserProfile(cachedData.profile)
+          setIsStale(cachedData.isStale)
+          
+          // Fetch metadata for followers and following from cached data
+          const metadata: Record<string, any> = {}
+          const allUsers = Array.from(new Set([...cachedData.profile.followers, ...cachedData.profile.following]))
+          
+          await Promise.all(
+            allUsers.map(async (pubkey) => {
+              try {
+                // @ts-ignore
+                const userMetadata = await window.apna.nostr.fetchUserMetadata(pubkey)
+                metadata[pubkey] = userMetadata
+              } catch (error) {
+                console.error(`Failed to fetch metadata for ${pubkey}:`, error)
+              }
+            })
+          )
+          
+          setUserMetadata(metadata)
+          
+          // If data is stale, fetch fresh data in background
+          if (cachedData.isStale) {
+            fetchFreshData()
+          }
+        } else {
+          // No cache, fetch fresh data
+          await fetchFreshData()
+        }
 
         // Fetch user's notes
         // @ts-ignore
         const notes = await window.apna.nostr.fetchUserFeed(params.pubkey, 'NOTES_FEED', undefined, undefined, 20)
         setUserNotes(notes)
 
+      } catch (error) {
+        console.error("Failed to fetch user data:", error)
+      } finally {
+        setLoadingNotes(false)
+      }
+    }
+
+    const fetchFreshData = async () => {
+      try {
+        // @ts-ignore
+        const freshProfile = await window.apna.nostr.fetchUserProfile(params.pubkey)
+        const profileWithPubkey = {
+          ...freshProfile,
+          pubkey: params.pubkey // Ensure pubkey is included
+        }
+        setUserProfile(profileWithPubkey)
+        setIsStale(false)
+
+        // Update cache
+        await userProfileDB.updateProfile(profileWithPubkey)
+
         // Fetch metadata for followers and following
         const metadata: Record<string, any> = {}
-        const allUsers = Array.from(new Set([...profile.followers, ...profile.following]))
+        const allUsers = Array.from(new Set([...freshProfile.followers, ...freshProfile.following]))
 
         await Promise.all(
           allUsers.map(async (pubkey) => {
@@ -55,9 +108,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
 
         setUserMetadata(metadata)
       } catch (error) {
-        console.error("Failed to fetch user data:", error)
-      } finally {
-        setLoadingNotes(false)
+        console.error("Failed to fetch fresh data:", error)
       }
     }
 
@@ -98,7 +149,14 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
             <div className="flex-1">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-2xl font-bold">{userProfile.metadata.name || "Unknown"}</h1>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-2xl font-bold">{userProfile.metadata.name || "Unknown"}</h1>
+                    {isStale && (
+                      <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full animate-pulse">
+                        Updating...
+                      </div>
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground break-all">{params.pubkey}</p>
                 </div>
                 {profile && profile.pubkey !== params.pubkey && (
