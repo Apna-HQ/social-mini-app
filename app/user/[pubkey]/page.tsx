@@ -118,7 +118,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
   if (!userProfile) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container max-w-screen-md py-4">
+        <div className="max-w-screen-md mx-auto py-4 px-4">
           <div className="text-center py-8 text-muted-foreground">
             Loading profile...
           </div>
@@ -129,7 +129,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container max-w-screen-md py-4">
+      <div className="max-w-screen-md mx-auto py-4 px-4">
         {/* Back Button */}
         <Button
           variant="ghost"
@@ -146,42 +146,39 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
             <div className="w-20 h-20 rounded-full bg-accent flex items-center justify-center text-2xl font-bold">
               {userProfile.metadata.name?.[0] || "U"}
             </div>
-            <div className="flex-1">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-2xl font-bold">{userProfile.metadata.name || "Unknown"}</h1>
-                    {isStale && (
-                      <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full animate-pulse">
-                        Updating...
-                      </div>
-                    )}
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold">{userProfile.metadata.name || "Unknown"}</h1>
+                {isStale && (
+                  <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full animate-pulse">
+                    Updating...
                   </div>
-                  <p className="text-sm text-muted-foreground break-all">{params.pubkey}</p>
-                </div>
-                {profile && profile.pubkey !== params.pubkey && (
-                  <Button
-                    variant={profile.following.includes(params.pubkey) ? "outline" : "default"}
-                    onClick={async () => {
-                      try {
-                        if (profile.following.includes(params.pubkey)) {
-                          // @ts-ignore
-                          await window.apna.nostr.unfollowUser(params.pubkey);
-                        } else {
-                          // @ts-ignore
-                          await window.apna.nostr.followUser(params.pubkey);
-                        }
-                      } catch (error) {
-                        console.error("Failed to follow/unfollow user:", error);
-                      }
-                    }}
-                  >
-                    {profile.following.includes(params.pubkey) ? "Unfollow" : "Follow"}
-                  </Button>
                 )}
               </div>
+              <p className="text-sm text-muted-foreground break-all">{params.pubkey}</p>
             </div>
           </div>
+          {profile && profile.pubkey !== params.pubkey && (
+            <Button
+              className="mt-4 ml-24"
+              variant={profile.following.includes(params.pubkey) ? "outline" : "default"}
+              onClick={async () => {
+                try {
+                  if (profile.following.includes(params.pubkey)) {
+                    // @ts-ignore
+                    await window.apna.nostr.unfollowUser(params.pubkey);
+                  } else {
+                    // @ts-ignore
+                    await window.apna.nostr.followUser(params.pubkey);
+                  }
+                } catch (error) {
+                  console.error("Failed to follow/unfollow user:", error);
+                }
+              }}
+            >
+              {profile.following.includes(params.pubkey) ? "Unfollow" : "Follow"}
+            </Button>
+          )}
           
           {/* Bio */}
           {userProfile.metadata.about && (

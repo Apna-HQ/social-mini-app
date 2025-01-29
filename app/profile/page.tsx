@@ -56,7 +56,7 @@ export default function ProfilePage() {
   if (!profile) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container max-w-screen-md py-4">
+        <div className="container max-w-screen-md py-4 px-4">
           <div className="text-center py-8 text-muted-foreground">
             Loading profile...
           </div>
@@ -67,7 +67,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container max-w-screen-md py-4">
+      <div className="container max-w-screen-md py-4 px-4">
         {/* Profile Header */}
         <div className="mb-6">
           {isEditing ? (
@@ -135,24 +135,22 @@ export default function ProfilePage() {
                   {profile.metadata.name?.[0] || "U"}
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">{profile.metadata.name || "Unknown"}</h1>
-                    <button
-                      onClick={() => {
-                        setEditForm({
-                          name: profile.metadata.name || '',
-                          about: profile.metadata.about || ''
-                        });
-                        setIsEditing(true);
-                      }}
-                      className="px-3 py-1 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90"
-                    >
-                      Edit Profile
-                    </button>
-                  </div>
+                  <h1 className="text-2xl font-bold">{profile.metadata.name || "Unknown"}</h1>
                   <p className="text-sm text-muted-foreground break-all">{profile.pubkey}</p>
                 </div>
               </div>
+              <button
+                onClick={() => {
+                  setEditForm({
+                    name: profile.metadata.name || '',
+                    about: profile.metadata.about || ''
+                  });
+                  setIsEditing(true);
+                }}
+                className="mt-4 ml-24 px-3 py-1 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90"
+              >
+                Edit Profile
+              </button>
               
               {/* Bio */}
               {profile.metadata.about && (

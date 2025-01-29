@@ -112,7 +112,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="container max-w-screen-md py-4">
+      <div className="max-w-screen-md mx-auto py-4">
         {/* Feed */}
         <div className="space-y-4">
           {notes.map((note) => (
