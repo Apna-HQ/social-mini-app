@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useApp } from "../../providers"
 import { Post } from "@/components/ui/post"
@@ -9,28 +9,75 @@ import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft } from "lucide-react"
 import type { INote, INoteReply } from "@apna/sdk"
 
-export default function NotePage() {
+// Separate component for reply form to prevent parent re-renders
+const ReplyForm = ({ noteId, onSubmit }: { noteId: string; onSubmit: (content: string) => Promise<void> }) => {
+  const [content, setContent] = useState("")
+
+  const handleSubmit = async () => {
+    if (!content.trim()) return
+    await onSubmit(content)
+    setContent("")
+  }
+
+  return (
+    <div className="mt-4 mb-6 ml-12 space-y-2">
+      <Textarea
+        placeholder="Write your reply..."
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        className="min-h-[100px]"
+      />
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={() => onSubmit("")}>Cancel</Button>
+        <Button onClick={handleSubmit}>Reply</Button>
+      </div>
+    </div>
+  )
+}
+
+export default function ThreadPage() {
   const router = useRouter()
   const { id } = useParams()
   const { replyToNote, fetchNoteAndReplies } = useApp()
-  const [replyContent, setReplyContent] = useState("")
   const [mainNote, setMainNote] = useState<INote | null>(null)
   const [replies, setReplies] = useState<INoteReply[]>([])
   const [loading, setLoading] = useState(true)
+  const [replyingTo, setReplyingTo] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchNote = async () => {
       try {
+        // First fetch the current note
         const result = await fetchNoteAndReplies(id as string)
         console.log('Fetched note and replies:', result)
-        if (result?.note) {
-          setMainNote(result.note)
-        }
-        if (Array.isArray(result?.replyNotes)) {
-          setReplies(result.replyNotes)
+        // Set the initial replyingTo state to the clicked note
+        setReplyingTo(id as string)
+        
+        // Check if this is a reply and has a root note
+        const rootNoteId = (result?.note?.tags as string[][])?.find(
+          tag => tag[0] === "e" && tag[3] === "root"
+        )?.[1]
+
+        // If this is a reply, fetch the thread from root
+        if (rootNoteId && rootNoteId !== id) {
+          const rootResult = await fetchNoteAndReplies(rootNoteId)
+          if (rootResult?.note) {
+            setMainNote(rootResult.note)
+            if (Array.isArray(rootResult?.replyNotes)) {
+              setReplies(rootResult.replyNotes)
+            }
+          }
         } else {
-          console.error('Unexpected replies format:', result?.replyNotes)
-          setReplies([])
+          // Not a reply or is the root note itself
+          if (result?.note) {
+            setMainNote(result.note)
+          }
+          if (Array.isArray(result?.replyNotes)) {
+            setReplies(result.replyNotes)
+          } else {
+            console.error('Unexpected replies format:', result?.replyNotes)
+            setReplies([])
+          }
         }
       } catch (error) {
         console.error("Failed to fetch note:", error)
@@ -42,24 +89,63 @@ export default function NotePage() {
     fetchNote()
   }, [id, fetchNoteAndReplies])
 
-  // Debug logging for replies
-  useEffect(() => {
-    console.log('Current replies state:', replies)
-  }, [replies])
+  const handleReplySubmit = async (noteId: string, content: string) => {
+    if (!content) {
+      setReplyingTo(null)
+      return
+    }
 
-  const handleSubmitReply = async () => {
-    if (!replyContent.trim()) return
     try {
-      await replyToNote(id as string, replyContent)
-      setReplyContent("")
+      await replyToNote(noteId, content)
       // Fetch updated replies
       const result = await fetchNoteAndReplies(id as string)
       if (Array.isArray(result?.replyNotes)) {
         setReplies(result.replyNotes)
       }
+      // Clear replyingTo after successful reply
+      setReplyingTo(null)
     } catch (error) {
       console.error("Failed to submit reply:", error)
     }
+  }
+
+  const NotePost = ({ note, level = 0, isTarget = false }: { note: INote | INoteReply; level?: number; isTarget?: boolean }) => {
+    const noteRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      if (isTarget && noteRef.current) {
+        setTimeout(() => {
+          noteRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      }
+    }, [isTarget]);
+
+    return (
+      <div ref={noteRef} style={{ marginLeft: `${level * 24}px` }}>
+        <Post
+          id={undefined} // Prevent navigation by not passing the id
+          content={note.content}
+          author={{
+            name: note.pubkey.slice(0, 8),
+            picture: undefined,
+            pubkey: note.pubkey
+          }}
+          timestamp={note.created_at}
+          onReply={() => {
+            if (noteRef.current) {
+              noteRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            setReplyingTo(note.id);
+          }}
+        />
+        {replyingTo === note.id && (
+          <ReplyForm 
+            noteId={note.id} 
+            onSubmit={(content) => handleReplySubmit(note.id, content)} 
+          />
+        )}
+      </div>
+    );
   }
 
   if (loading) {
@@ -70,7 +156,7 @@ export default function NotePage() {
             <Button variant="ghost" size="icon" onClick={() => router.back()}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl font-semibold">Loading...</h1>
+            <h1 className="text-xl font-semibold">Loading Thread...</h1>
           </div>
           <div className="flex justify-center py-8">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -88,12 +174,54 @@ export default function NotePage() {
             <Button variant="ghost" size="icon" onClick={() => router.back()}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl font-semibold">Note not found</h1>
+            <h1 className="text-xl font-semibold">Thread not found</h1>
           </div>
         </div>
       </div>
     )
   }
+
+  // Helper function to organize replies hierarchically
+  const organizeReplies = () => {
+    const replyMap = new Map<string, INoteReply[]>();
+    
+    // Group replies by their direct parent
+    replies.forEach(reply => {
+      const tags = reply.tags as string[][];
+      let parentId = mainNote.id; // Default to main note
+
+      // Find all "e" tags marked as "reply"
+      const replyTags = tags?.filter(tag => tag[0] === "e" && tag[3] === "reply");
+      if (replyTags?.length > 0) {
+        // Use the last reply tag as the parent
+        parentId = replyTags[replyTags.length - 1][1];
+      } else {
+        // If no reply tags, check for root tag
+        const rootTag = tags?.find(tag => tag[0] === "e" && tag[3] === "root");
+        if (rootTag) {
+          parentId = rootTag[1];
+        }
+      }
+      
+      if (!replyMap.has(parentId)) {
+        replyMap.set(parentId, []);
+      }
+      replyMap.get(parentId)?.push(reply);
+    });
+
+    // Recursive function to render replies with proper indentation
+    const renderReplies = (parentId: string, level: number = 0) => {
+      const children = replyMap.get(parentId) || [];
+      return children.map((reply) => (
+        <div key={reply.id}>
+          <NotePost note={reply} level={level} isTarget={reply.id === id} />
+          {renderReplies(reply.id, level + 1)}
+        </div>
+      ));
+    };
+
+    return renderReplies(mainNote.id);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -102,51 +230,25 @@ export default function NotePage() {
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-xl font-semibold">Note</h1>
+          <h1 className="text-xl font-semibold">Thread</h1>
         </div>
 
         {/* Main Note */}
-        <Post
-          id={mainNote.id}
-          content={mainNote.content}
-          author={{
-            name: mainNote.pubkey.slice(0, 8),
-            picture: undefined,
-            pubkey: mainNote.pubkey
-          }}
-          timestamp={mainNote.created_at}
-        />
-
-        {/* Reply Form */}
-        <div className="mt-4 mb-6 space-y-2">
-          <Textarea
-            placeholder="Write your reply..."
-            value={replyContent}
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReplyContent(e.target.value)}
-            className="min-h-[100px]"
+        <NotePost note={mainNote} isTarget={mainNote.id === id} />
+        {replyingTo === mainNote.id && (
+          <ReplyForm 
+            noteId={mainNote.id} 
+            onSubmit={(content) => handleReplySubmit(mainNote.id, content)} 
           />
-          <div className="flex justify-end">
-            <Button onClick={handleSubmitReply}>Reply</Button>
-          </div>
-        </div>
+        )}
 
         {/* Replies */}
-        <div className="space-y-4">
+        <div className="space-y-4 mt-6">
           <h2 className="text-lg font-semibold">Replies ({replies.length})</h2>
           {replies.length > 0 ? (
-            replies.map((reply) => (
-              <Post
-                key={reply.id}
-                id={reply.id}
-                content={reply.content}
-                author={{
-                  name: reply.pubkey.slice(0, 8),
-                  picture: undefined,
-                  pubkey: reply.pubkey
-                }}
-                timestamp={reply.created_at}
-              />
-            ))
+            <div className="space-y-6">
+              {organizeReplies()}
+            </div>
           ) : (
             <p className="text-muted-foreground">No replies yet</p>
           )}
