@@ -1,18 +1,23 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb'
 
+interface BaseNote {
+  id: string
+  content: string
+  pubkey: string
+  created_at: number
+}
+
+interface StoredNote extends BaseNote {
+  cached_at: number
+}
+
 interface FeedDBSchema extends DBSchema {
   feed: {
     key: string
-    value: {
-      id: string
-      content: string
-      pubkey: string
-      created_at: number
-      cached_at: number // New field to track when the note was cached
-    }
+    value: StoredNote
     indexes: {
       'by-timestamp': number
-      'by-cached-at': number // New index for cache cleanup
+      'by-cached-at': number
     }
   }
 }
@@ -73,69 +78,92 @@ class FeedDB {
     const store = tx.objectStore('feed')
     const cachedAtIndex = store.index('by-cached-at')
 
-    // Delete old items
-    const oldestAllowedDate = Date.now() - (MAX_CACHE_AGE_DAYS * 24 * 60 * 60 * 1000)
-    let cursor = await cachedAtIndex.openCursor()
-    
-    while (cursor) {
-      if (cursor.value.cached_at < oldestAllowedDate) {
-        await cursor.delete()
-      }
-      cursor = await cursor.continue()
-    }
-
-    // If still too many items, delete oldest by cached_at
-    const count = await store.count()
-    if (count > MAX_CACHE_ITEMS) {
-      cursor = await cachedAtIndex.openCursor()
-      let deletedCount = 0
-      const deleteCount = count - MAX_CACHE_ITEMS
+    try {
+      // Delete old items
+      const oldestAllowedDate = Date.now() - (MAX_CACHE_AGE_DAYS * 24 * 60 * 60 * 1000)
+      const oldItemsToDelete: string[] = []
       
-      while (cursor && deletedCount < deleteCount) {
-        await cursor.delete()
-        deletedCount++
+      let cursor = await cachedAtIndex.openCursor()
+      while (cursor) {
+        if (cursor.value.cached_at < oldestAllowedDate) {
+          oldItemsToDelete.push(cursor.value.id)
+        }
         cursor = await cursor.continue()
       }
-    }
 
-    await tx.done
+      // Delete old items in batch
+      await Promise.all(oldItemsToDelete.map(id => store.delete(id)))
+
+      // If still too many items, delete oldest by cached_at
+      const count = await store.count()
+      if (count > MAX_CACHE_ITEMS) {
+        const itemsToDelete: string[] = []
+        const deleteCount = count - MAX_CACHE_ITEMS
+        
+        cursor = await cachedAtIndex.openCursor()
+        while (cursor && itemsToDelete.length < deleteCount) {
+          itemsToDelete.push(cursor.value.id)
+          cursor = await cursor.continue()
+        }
+
+        // Delete excess items in batch
+        await Promise.all(itemsToDelete.map(id => store.delete(id)))
+      }
+
+      await tx.done
+    } catch (error) {
+      console.error('Error during cleanup:', error)
+      throw error
+    }
   }
 
-  async addNotes(notes: any[]) {
+  async addNotes(notes: BaseNote[]) {
     const db = await this.init()
     const tx = db.transaction('feed', 'readwrite')
     const store = tx.store
     
     const now = Date.now()
-    const existingNotes = new Set()
     
-    // Get existing note IDs to prevent duplicates
-    for (const note of notes) {
-      const existing = await store.get(note.id)
-      if (existing) {
-        existingNotes.add(note.id)
-      }
-    }
-    
-    // Add new notes with cached_at timestamp
-    await Promise.all([
-      ...notes
-        .filter(note => !existingNotes.has(note.id))
-        .map(note => store.put({
-          ...note,
-          cached_at: now
-        })),
-      tx.done
-    ])
+    try {
+      // Get all existing notes in one batch operation
+      const existingNotes = await Promise.all(
+        notes.map(note => store.get(note.id))
+      )
+      const existingNoteIds = new Set(
+        existingNotes
+          .filter((note): note is StoredNote => note !== null && note !== undefined)
+          .map(note => note.id)
+      )
+      
+      // Add new notes with cached_at timestamp
+      const notesToAdd = notes.filter(note => !existingNoteIds.has(note.id))
+      
+      // Transform BaseNotes to StoredNotes
+      const storedNotes: StoredNote[] = notesToAdd.map(note => ({
+        ...note,
+        cached_at: now
+      }))
+      
+      // Store the notes
+      await Promise.all(
+        storedNotes.map(note => store.put(note))
+      )
 
-    // Trigger cleanup if we might be over limit
-    const count = await store.count()
-    if (count > MAX_CACHE_ITEMS * 0.9) { // Cleanup when at 90% capacity
-      this.cleanup()
+      // Check count and trigger cleanup while transaction is still active
+      const count = await store.count()
+      await tx.done
+
+      // Only trigger cleanup after transaction is complete
+      if (count > MAX_CACHE_ITEMS * 0.9) { // Cleanup when at 90% capacity
+        await this.cleanup()
+      }
+    } catch (error) {
+      console.error('Error adding notes:', error)
+      throw error
     }
   }
 
-  async getNotes(limit: number = 20, before?: number): Promise<any[]> {
+  async getNotes(limit: number = 20, before?: number): Promise<StoredNote[]> {
     const db = await this.init()
     const tx = db.transaction('feed', 'readonly')
     const index = tx.store.index('by-timestamp')
@@ -145,10 +173,10 @@ class FeedDB {
       ? await index.openCursor(IDBKeyRange.upperBound(before), 'prev')
       : await index.openCursor(null, 'prev')
 
-    const notes: any[] = []
+    const notes: StoredNote[] = []
 
     while (cursor) {
-      const note = cursor.value
+      const note = cursor.value as StoredNote
       if (!seen.has(note.id)) {
         seen.add(note.id)
         notes.push(note)
