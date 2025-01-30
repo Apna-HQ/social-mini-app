@@ -253,11 +253,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       await ensureApnaInitialized()
       const result = await apna.nostr.publishNote(content)
-      if (result) {
-        const { feedDB } = await import('@/lib/feedDB')
-        await feedDB.addNotes([result])
-        setNotes(prev => [result, ...prev].sort((a, b) => b.created_at - a.created_at))
-      }
     } catch (error) {
       console.error("Failed to publish note:", error)
       throw error

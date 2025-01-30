@@ -21,6 +21,8 @@ export function Fab({ onPublish }: FabProps) {
       setIsOpen(false)
     } catch (error) {
       console.error("Failed to publish:", error)
+      // Show error state to user
+      alert("Failed to publish post. Please try again.")
     } finally {
       setIsPublishing(false)
     }
