@@ -15,11 +15,12 @@ interface PostProps {
   onLike?: () => void
   onRepost?: () => void
   onReply?: () => void
+  isReply?: boolean
 }
 
 import { useRouter } from "next/navigation"
 
-export function Post({ content, author, timestamp, onLike, onRepost, onReply, id }: PostProps & { id?: string }) {
+export function Post({ content, author, timestamp, onLike, onRepost, onReply, id, isReply }: PostProps & { id?: string }) {
   const router = useRouter()
   
   const handleClick = () => {
@@ -55,6 +56,11 @@ export function Post({ content, author, timestamp, onLike, onRepost, onReply, id
       </CardHeader>
       <CardContent className="pb-3">
         <div className="relative">
+          {isReply && (
+            <span className="text-xs text-muted-foreground/50 mb-1 block">
+              reply
+            </span>
+          )}
           <p className={`whitespace-pre-wrap break-words ${!isExpanded && shouldTruncate ? "line-clamp-4" : ""}`}>
             {content}
           </p>

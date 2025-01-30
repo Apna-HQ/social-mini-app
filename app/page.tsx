@@ -4,6 +4,7 @@ import { Post } from "@/components/ui/post"
 import { Fab } from "@/components/ui/fab"
 import { useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import type { INote } from "@apna/sdk"
 
 export default function Home() {
   const router = useRouter()
@@ -115,7 +116,7 @@ export default function Home() {
       <div className="max-w-screen-md mx-auto py-4">
         {/* Feed */}
         <div className="space-y-4">
-          {notes.map((note) => (
+          {notes.map((note: INote) => (
             <Post
               key={note.id}
               id={note.id}
@@ -129,6 +130,11 @@ export default function Home() {
               onLike={() => likeNote(note.id)}
               onRepost={() => repostNote(note.id)}
               onReply={() => router.push(`/note/${note.id}`)}
+              isReply={note.tags?.some(tag =>
+                Array.isArray(tag) &&
+                tag[0] === "e" &&
+                (tag[3] === "reply" || tag[3] === "root")
+              )}
             />
           ))}
           {notes.length === 0 && (
