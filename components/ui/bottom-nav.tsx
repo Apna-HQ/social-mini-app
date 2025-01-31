@@ -1,7 +1,7 @@
 "use client"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, User } from "lucide-react"
+import { Home, User, Search } from "lucide-react"
 
 export function BottomNav() {
   const pathname = usePathname()
@@ -19,6 +19,17 @@ export function BottomNav() {
         >
           <Home className="w-5 h-5" />
           <span className="text-xs">Home</span>
+        </Link>
+        <Link 
+          href="/search"
+          className={`flex flex-col items-center gap-1 ${
+            pathname === "/search" 
+              ? "text-primary" 
+              : "text-muted-foreground hover:text-primary"
+          }`}
+        >
+          <Search className="w-5 h-5" />
+          <span className="text-xs">Search</span>
         </Link>
         <Link 
           href="/profile"

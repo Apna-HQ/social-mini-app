@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter, usePathname } from "next/navigation"
-import { Home, User } from "lucide-react"
+import { Home, User, Search } from "lucide-react"
 
 export function Nav() {
   const router = useRouter()
@@ -19,6 +19,15 @@ export function Nav() {
           >
             <Home className="w-6 h-6" />
             <span className="text-xs mt-1">Home</span>
+          </button>
+          <button
+            onClick={() => router.push("/search")}
+            className={`flex flex-col items-center p-2 rounded-lg transition-colors ${
+              pathname === "/search" ? "text-primary" : "text-muted-foreground hover:text-primary"
+            }`}
+          >
+            <Search className="w-6 h-6" />
+            <span className="text-xs mt-1">Search</span>
           </button>
           <button
             onClick={() => router.push("/profile")}

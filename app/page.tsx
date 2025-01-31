@@ -15,14 +15,14 @@ export default function Home() {
   const pullMoveY = useRef<number | null>(null)
   const refreshIndicatorRef = useRef<HTMLDivElement>(null)
 
-  const handleTouchStart = (e: React.TouchEvent) => {
+  const handleTouchStart = (e: React.TouchEvent): void => {
     // Only enable pull to refresh when at top of page
     if (window.scrollY === 0) {
       pullStartY.current = e.touches[0].clientY
     }
   }
 
-  const handleTouchMove = (e: React.TouchEvent) => {
+  const handleTouchMove = (e: React.TouchEvent): void => {
     if (!pullStartY.current) return
 
     pullMoveY.current = e.touches[0].clientY
@@ -36,7 +36,7 @@ export default function Home() {
     }
   }
 
-  const handleTouchEnd = async () => {
+  const handleTouchEnd = async (): Promise<void> => {
     if (!pullStartY.current || !pullMoveY.current) return
 
     const pullDistance = pullMoveY.current - pullStartY.current
@@ -54,7 +54,7 @@ export default function Home() {
     }
   }
 
-  const handleScroll = useCallback(() => {
+  const handleScroll = useCallback((): void => {
     if (!bottomRef.current || loadingMore) return
 
     const bottomElement = bottomRef.current
@@ -90,7 +90,7 @@ export default function Home() {
 
   return (
     <main
-      className="min-h-screen bg-background relative"
+      className="min-h-screen bg-background relative pb-20"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
