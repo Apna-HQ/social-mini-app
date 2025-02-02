@@ -169,6 +169,22 @@ export const withDynamicComponent = (remoteModuleName: string, DefaultComponent:
                 <h3 className="font-medium px-4 mb-4">Select Remote Component</h3>
                 {!showSubmitForm && (
                   <>
+                    <SelectOption
+                      key="default"
+                      value="default"
+                      label="Default"
+                      onClick={() => {
+                        setRemoteComponent(null);
+                        setIsBottomSheetOpen(false);
+                        // Clear from localStorage
+                        const storedSelections = localStorage.getItem('remoteComponentSelections')
+                        if (storedSelections) {
+                          const selections = JSON.parse(storedSelections)
+                          delete selections[remoteModuleName]
+                          localStorage.setItem('remoteComponentSelections', JSON.stringify(selections))
+                        }
+                      }}
+                    />
                     {REMOTE_OPTIONS.filter(option => validRemotes.has(option.name)).map(option => (
                       <SelectOption
                         key={option.name}
