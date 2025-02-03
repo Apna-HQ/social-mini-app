@@ -1,13 +1,14 @@
 "use client"
 
 import { Fab } from "./fab"
-import { useDynamicComponent } from "./with-dynamic-component"
+import { useApna } from "@apna/sdk"
 
 export function FabWithHighlight() {
-  const { toggleHighlight } = useDynamicComponent()
+  const { toggleHighlight } = useApna()
 
   return (
     <Fab onPublish={() => {
+      console.log('here')
       toggleHighlight()
       return Promise.resolve()
     }} />

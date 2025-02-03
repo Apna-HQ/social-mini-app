@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, createContext, useContext, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { BottomSheet, SelectOption } from "./bottom-sheet"
 import { loadRemote, registerRemotes } from '@/utils/federation'
+import { useApna } from "@apna/sdk"
 
 interface RemoteButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode
@@ -23,37 +24,10 @@ const REMOTE_OPTIONS = [
   }
 ]
 
-interface DynamicComponentContext {
-  toggleHighlight: () => void
-  isHighlighted: boolean
-}
-
-const DynamicComponentContext = createContext<DynamicComponentContext | null>(null)
-
-export const useDynamicComponent = () => {
-  const context = useContext(DynamicComponentContext)
-  if (!context) {
-    throw new Error('useDynamicComponent must be used within a DynamicComponentProvider')
-  }
-  return context
-}
-
-export const DynamicComponentProvider = ({ children }: { children: React.ReactNode }) => {
-  const [isHighlighted, setIsHighlighted] = useState(false)
-
-  const toggleHighlight = () => {
-    setIsHighlighted(prev => !prev)
-  }
-
-  return (
-    <DynamicComponentContext.Provider value={{ toggleHighlight, isHighlighted }}>
-      {children}
-    </DynamicComponentContext.Provider>
-  )
-}
-
 export const withDynamicComponent = (remoteModuleName: string, DefaultComponent: React.ComponentType<any>) => {
   function DynamicComponent(props: any) {
+    const { isHighlighted } = useApna()
+    console.log(isHighlighted)
     const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false)
     const [RemoteComponent, setRemoteComponent] = useState<React.ComponentType<RemoteButtonProps> | null>(null)
     const [error, setError] = useState<string | null>(null)
@@ -151,12 +125,11 @@ export const withDynamicComponent = (remoteModuleName: string, DefaultComponent:
     const SelectedComponent = RemoteComponent || DefaultComponent
 
     return (
-      <DynamicComponentContext.Consumer>
-        {(context) => (
+
           <>
             <div 
-              className={`${context?.isHighlighted ? "border-4 border-[#368564] rounded-md" : ""}`}
-              onClick={context?.isHighlighted ? handleBorderClick : undefined}
+              className={`${isHighlighted ? "border-4 border-[#368564] rounded-md" : ""}`}
+              onClick={isHighlighted ? handleBorderClick : undefined}
             >
               <SelectedComponent {...props} />
             </div>
@@ -264,8 +237,7 @@ export const withDynamicComponent = (remoteModuleName: string, DefaultComponent:
               </div>
             </BottomSheet>
           </>
-        )}
-      </DynamicComponentContext.Consumer>
+
     )
   }
 

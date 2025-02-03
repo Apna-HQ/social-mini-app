@@ -5,7 +5,6 @@ import { Post } from "@/components/ui/post"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FabWithHighlight } from "@/components/ui/fab-with-highlight"
 import { DynamicEditProfile } from "@/components/ui/dynamic-edit-profile"
-import { useDynamicComponent, DynamicComponentProvider } from "@/components/ui/with-dynamic-component"
 import { useEffect, useState } from "react"
 
 export default function ProfilePage() {
@@ -69,7 +68,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <DynamicComponentProvider>
+    <>
       <div className="min-h-screen bg-background">
       <div className="container max-w-screen-md py-4 px-4">
         {/* Profile Header */}
@@ -254,6 +253,6 @@ export default function ProfilePage() {
       </div>
       <FabWithHighlight />
       </div>
-    </DynamicComponentProvider>
+    </>
   )
 }

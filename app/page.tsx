@@ -130,6 +130,7 @@ export default function Home() {
               onLike={() => likeNote(note.id)}
               onRepost={() => repostNote(note.id)}
               onReply={() => router.push(`/note/${note.id}`)}
+              // @ts-ignore
               isReply={note.tags?.some(tag =>
                 Array.isArray(tag) &&
                 tag[0] === "e" &&
