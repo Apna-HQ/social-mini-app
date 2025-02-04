@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button"
 import { ChevronLeft } from "lucide-react"
 import { userProfileDB } from "@/lib/userProfileDB"
 
+export const dynamic = 'force-dynamic'
+
 export default function UserProfilePage({ params }: { params: { pubkey: string } }) {
   const router = useRouter()
   const { profile } = useApp()

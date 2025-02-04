@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft } from "lucide-react"
 import type { INote, INoteReply } from "@apna/sdk"
 
+export const dynamic = 'force-dynamic'
+
 // Separate component for reply form to prevent parent re-renders
 const ReplyForm = ({ noteId, onSubmit }: { noteId: string; onSubmit: (content: string) => Promise<void> }) => {
   const [content, setContent] = useState("")
