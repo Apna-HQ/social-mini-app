@@ -1,7 +1,7 @@
 "use client"
 import { createContext, useCallback, useContext, useEffect, useState } from "react"
-import { ApnaApp } from "@apna/sdk"
 import { nip19 } from "nostr-tools"
+import { useApna } from "@apna/sdk"
 
 type DecodedNprofile = {
   type: 'nprofile'
@@ -48,24 +48,18 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null)
 
-let apna: ApnaApp
 
 const SCROLL_POSITION_KEY = 'feed-scroll-position'
 
 const ensureApnaInitialized = async () => {
-  if (!apna) {
-    const { ApnaApp } = (await import('@apna/sdk'))
-    apna = new ApnaApp({ appId: 'apna-nostr-mvp-1' })
-    // @ts-ignore
-    window.apna = apna
-  }
-  return apna
+  console.log("ensure")
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [notes, setNotes] = useState<any[]>([])
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const apna = useApna()
   const [loadingMore, setLoadingMore] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [lastTimestamp, setLastTimestamp] = useState<number | null>(null)
@@ -101,6 +95,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       await ensureApnaInitialized()
+      // apna.nostr.test()
       const userProfile = await apna.nostr.getActiveUserProfile()
       if (userProfile) {
         setProfile({
@@ -144,6 +139,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         
         setNotes(prev => {
           const seenIds = new Set(prev.map(note => note.id))
+          // @ts-ignore
           const uniqueNewNotes = freshNotes.filter(note => !seenIds.has(note.id))
           return [...uniqueNewNotes, ...prev].sort((a, b) => b.created_at - a.created_at)
         })
@@ -184,6 +180,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         
         setNotes(prev => {
           const seenIds = new Set(prev.map(note => note.id))
+          // @ts-ignore
           const uniqueNewNotes = freshNotes.filter(note => !seenIds.has(note.id))
           return [...uniqueNewNotes, ...prev].sort((a, b) => b.created_at - a.created_at)
         })
@@ -225,6 +222,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           lastTimestamp,
           LOAD_MORE_SIZE
         )
+        // @ts-ignore
         const uniqueNetworkNotes = olderNotes.filter(note => !seenNoteIds.has(note.id))
         
         if (uniqueNetworkNotes.length > 0) {

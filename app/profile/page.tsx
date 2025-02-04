@@ -3,10 +3,12 @@
 import { useApp } from "../providers"
 import { Post } from "@/components/ui/post"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Fab } from "@/components/ui/fab"
+import { DynamicEditProfile } from "@/components/ui/dynamic-edit-profile"
 import { useEffect, useState } from "react"
 
 export default function ProfilePage() {
-  const { profile, updateProfileMetadata } = useApp()
+  const { profile, updateProfileMetadata, publishNote } = useApp()
   const [userNotes, setUserNotes] = useState<any[]>([])
   const [userMetadata, setUserMetadata] = useState<Record<string, any>>({})
   const [loadingNotes, setLoadingNotes] = useState(true)
@@ -66,7 +68,8 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      <div className="min-h-screen bg-background">
       <div className="container max-w-screen-md py-4 px-4">
         {/* Profile Header */}
         <div className="mb-6">
@@ -139,18 +142,15 @@ export default function ProfilePage() {
                   <p className="text-sm text-muted-foreground break-all">{profile.pubkey}</p>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  setEditForm({
-                    name: profile.metadata.name || '',
-                    about: profile.metadata.about || ''
-                  });
+              <DynamicEditProfile
+                name={profile.metadata.name || ''}
+                about={profile.metadata.about || ''}
+                onEdit={({ name, about }: { name: string; about: string }) => {
+                  setEditForm({ name, about });
                   setIsEditing(true);
                 }}
                 className="mt-4 ml-24 px-3 py-1 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90"
-              >
-                Edit Profile
-              </button>
+              />
               
               {/* Bio */}
               {profile.metadata.about && (
@@ -251,6 +251,8 @@ export default function ProfilePage() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+      <Fab onPublish={publishNote} />
+      </div>
+    </>
   )
 }
