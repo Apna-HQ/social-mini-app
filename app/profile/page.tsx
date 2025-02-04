@@ -3,12 +3,12 @@
 import { useApp } from "../providers"
 import { Post } from "@/components/ui/post"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FabWithHighlight } from "@/components/ui/fab-with-highlight"
+import { Fab } from "@/components/ui/fab"
 import { DynamicEditProfile } from "@/components/ui/dynamic-edit-profile"
 import { useEffect, useState } from "react"
 
 export default function ProfilePage() {
-  const { profile, updateProfileMetadata } = useApp()
+  const { profile, updateProfileMetadata, publishNote } = useApp()
   const [userNotes, setUserNotes] = useState<any[]>([])
   const [userMetadata, setUserMetadata] = useState<Record<string, any>>({})
   const [loadingNotes, setLoadingNotes] = useState(true)
@@ -251,7 +251,7 @@ export default function ProfilePage() {
           </TabsContent>
         </Tabs>
       </div>
-      <FabWithHighlight />
+      <Fab onPublish={publishNote} />
       </div>
     </>
   )
