@@ -1,7 +1,7 @@
 "use client"
 import { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { nip19 } from "nostr-tools"
-import { useApna } from "@apna/sdk"
+import { useApna } from "@/components/providers/ApnaProvider"
 
 type DecodedNprofile = {
   type: 'nprofile'

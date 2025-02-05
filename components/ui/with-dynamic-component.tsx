@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { BottomSheet, SelectOption } from "./bottom-sheet"
 import { loadRemote, registerRemotes } from '@/utils/federation'
-import { useApna } from "@apna/sdk"
+import { useApna } from "@/components/providers/ApnaProvider" 
 
 interface RemoteButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode

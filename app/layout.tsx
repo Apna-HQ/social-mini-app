@@ -3,7 +3,7 @@
 import { AppProvider } from "./providers"
 import { Nav } from "@/components/ui/nav"
 import "./globals.css"
-import { ApnaProvider } from "@apna/sdk"
+import { ApnaProvider } from "@/components/providers/ApnaProvider"
 import { Suspense } from "react"
 
 export default function RootLayout({
