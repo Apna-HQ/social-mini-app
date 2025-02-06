@@ -13,16 +13,10 @@ interface RemoteModule {
   default: React.ComponentType<RemoteButtonProps>
 }
 
-const REMOTE_OPTIONS = [
-  {
-    name: 'apna_module_test',
-    entry: 'https://cdn.jsdelivr.net/npm/@nandubatchu/apna-module-test@1.0.6/dist/mf-manifest.json'
-  },
-  {
-    name: 'test_provider',
-    entry: 'http://localhost:3004/remoteEntry.js'
-  }
-]
+interface ValidRemote {
+  name: string;
+  entry: string;
+}
 
 export const withDynamicComponent = (remoteModuleName: string, DefaultComponent: React.ComponentType<any>) => {
   function DynamicComponent(props: any) {
@@ -31,12 +25,13 @@ export const withDynamicComponent = (remoteModuleName: string, DefaultComponent:
     const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false)
     const [RemoteComponent, setRemoteComponent] = useState<React.ComponentType<RemoteButtonProps> | null>(null)
     const [error, setError] = useState<string | null>(null)
-    const [validRemotes, setValidRemotes] = useState<Set<string>>(new Set())
+    const [validRemotes, setValidRemotes] = useState<Map<string, ValidRemote>>(new Map())
     const [showSubmitForm, setShowSubmitForm] = useState(false)
     const [formData, setFormData] = useState({ remoteName: '', remoteEntry: '' })
 
-    const validateRemote = async (remote: typeof REMOTE_OPTIONS[0]) => {
+    const validateRemote = async (remote: ValidRemote) => {
       try {
+        console.log(remote)
         await registerRemotes([
           {
             name: remote.name,
@@ -46,30 +41,26 @@ export const withDynamicComponent = (remoteModuleName: string, DefaultComponent:
         
         // Try to load the module to validate it exists
         await loadRemote(`${remote.name}/${remoteModuleName}`)
-        setValidRemotes(prev => new Set(Array.from(prev).concat(remote.name)))
+        setValidRemotes(prev => new Map(prev).set(remote.name, remote))
       } catch (err) {
         console.log(`Remote ${remote.name} does not have module ${remoteModuleName}`)
       }
     }
-
-    // Validate all remotes when component mounts
-    useEffect(() => {
-      REMOTE_OPTIONS.forEach(validateRemote)
-    }, [])
 
     // Load stored selection on mount
     useEffect(() => {
       const storedSelections = localStorage.getItem('remoteComponentSelections')
       if (storedSelections) {
         const selections = JSON.parse(storedSelections)
-        const storedRemote = REMOTE_OPTIONS.find(opt => opt.name === selections[remoteModuleName])
-        if (storedRemote) {
-          loadComponent(storedRemote, false)
+        const storedRemoteData = selections[remoteModuleName]
+        if (storedRemoteData) {
+          setValidRemotes(prev => new Map(prev).set(storedRemoteData.name, storedRemoteData))
+          loadComponent(storedRemoteData, false)
         }
       }
     }, [])
 
-    const loadComponent = async (remote: typeof REMOTE_OPTIONS[0], updateStorage: boolean = true) => {
+    const loadComponent = async (remote: ValidRemote, updateStorage: boolean = true) => {
       try {
         console.log('Updating remote configuration...')
         registerRemotes([
@@ -94,7 +85,10 @@ export const withDynamicComponent = (remoteModuleName: string, DefaultComponent:
         if (updateStorage) {
           const storedSelections = localStorage.getItem('remoteComponentSelections')
           const selections = storedSelections ? JSON.parse(storedSelections) : {}
-          selections[remoteModuleName] = remote.name
+          selections[remoteModuleName] = {
+            name: remote.name,
+            entry: remote.entry
+          }
           localStorage.setItem('remoteComponentSelections', JSON.stringify(selections))
         }
       } catch (err) {
@@ -158,12 +152,12 @@ export const withDynamicComponent = (remoteModuleName: string, DefaultComponent:
                         }
                       }}
                     />
-                    {REMOTE_OPTIONS.filter(option => validRemotes.has(option.name)).map(option => (
+                    {Array.from(validRemotes.values()).map(remote => (
                       <SelectOption
-                        key={option.name}
-                        value={option.name}
-                        label={option.name}
-                        onClick={() => loadComponent(option)}
+                        key={remote.name}
+                        value={remote.name}
+                        label={remote.name}
+                        onClick={() => loadComponent(remote)}
                       />
                     ))}
                     <div className="flex gap-2 px-4 mt-4">
