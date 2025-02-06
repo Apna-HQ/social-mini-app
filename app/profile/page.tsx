@@ -1,6 +1,7 @@
 "use client"
 
 import { useApp } from "../providers"
+import { useApna } from "@/components/providers/ApnaProvider"
 import { Post } from "@/components/ui/post"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Fab } from "@/components/ui/fab"
@@ -9,6 +10,7 @@ import { useEffect, useState } from "react"
 
 export default function ProfilePage() {
   const { profile, updateProfileMetadata, publishNote } = useApp()
+  const { nostr } = useApna()
   const [userNotes, setUserNotes] = useState<any[]>([])
   const [userMetadata, setUserMetadata] = useState<Record<string, any>>({})
   const [loadingNotes, setLoadingNotes] = useState(true)
@@ -23,8 +25,7 @@ export default function ProfilePage() {
       const fetchData = async () => {
         try {
           // Fetch user's notes using NOTES_FEED
-          // @ts-ignore
-          const notes = await window.apna.nostr.fetchUserFeed(profile.pubkey, 'NOTES_FEED', undefined, undefined, 20)
+          const notes = await nostr.fetchUserFeed(profile.pubkey, 'NOTES_FEED', undefined, undefined, 20)
           setUserNotes(notes)
         } catch (error) {
           console.error("Failed to fetch user notes:", error)
@@ -39,8 +40,7 @@ export default function ProfilePage() {
         await Promise.all(
           allUsers.map(async (pubkey) => {
             try {
-              // @ts-ignore
-              const userMetadata = await window.apna.nostr.fetchUserMetadata(pubkey)
+              const userMetadata = await nostr.fetchUserMetadata(pubkey)
               metadata[pubkey] = userMetadata
             } catch (error) {
               console.error(`Failed to fetch metadata for ${pubkey}:`, error)

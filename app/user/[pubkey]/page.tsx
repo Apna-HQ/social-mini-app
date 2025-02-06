@@ -1,6 +1,7 @@
 "use client"
 
 import { useApp } from "../../providers"
+import { useApna } from "@/components/providers/ApnaProvider"
 import { Post } from "@/components/ui/post"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useEffect, useState } from "react"
@@ -14,6 +15,7 @@ export const dynamic = 'force-dynamic'
 export default function UserProfilePage({ params }: { params: { pubkey: string } }) {
   const router = useRouter()
   const { profile } = useApp()
+  const { nostr } = useApna()
   const [userNotes, setUserNotes] = useState<any[]>([])
   const [loadingNotes, setLoadingNotes] = useState(true)
   const [userProfile, setUserProfile] = useState<{
@@ -46,8 +48,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
           await Promise.all(
             allUsers.map(async (pubkey) => {
               try {
-                // @ts-ignore
-                const userMetadata = await window.apna.nostr.fetchUserMetadata(pubkey)
+                const userMetadata = await nostr.fetchUserMetadata(pubkey)
                 metadata[pubkey] = userMetadata
               } catch (error) {
                 console.error(`Failed to fetch metadata for ${pubkey}:`, error)
@@ -67,8 +68,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
         }
 
         // Fetch user's notes
-        // @ts-ignore
-        const notes = await window.apna.nostr.fetchUserFeed(params.pubkey, 'NOTES_FEED', undefined, undefined, 20)
+        const notes = await nostr.fetchUserFeed(params.pubkey, 'NOTES_FEED', undefined, undefined, 20)
         setUserNotes(notes)
 
       } catch (error) {
@@ -80,8 +80,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
 
     const fetchFreshData = async () => {
       try {
-        // @ts-ignore
-        const freshProfile = await window.apna.nostr.fetchUserProfile(params.pubkey)
+        const freshProfile = await nostr.fetchUserProfile(params.pubkey)
         const profileWithPubkey = {
           ...freshProfile,
           pubkey: params.pubkey // Ensure pubkey is included
@@ -99,8 +98,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
         await Promise.all(
           allUsers.map(async (pubkey) => {
             try {
-              // @ts-ignore
-              const userMetadata = await window.apna.nostr.fetchUserMetadata(pubkey)
+              const userMetadata = await nostr.fetchUserMetadata(pubkey)
               metadata[pubkey] = userMetadata
             } catch (error) {
               console.error(`Failed to fetch metadata for ${pubkey}:`, error)
@@ -167,11 +165,9 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
               onClick={async () => {
                 try {
                   if (profile.following.includes(params.pubkey)) {
-                    // @ts-ignore
-                    await window.apna.nostr.unfollowUser(params.pubkey);
+                    await nostr.unfollowUser(params.pubkey);
                   } else {
-                    // @ts-ignore
-                    await window.apna.nostr.followUser(params.pubkey);
+                    await nostr.followUser(params.pubkey);
                   }
                 } catch (error) {
                   console.error("Failed to follow/unfollow user:", error);

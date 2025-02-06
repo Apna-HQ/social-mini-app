@@ -1,12 +1,66 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from './button'
 import { userProfileDB } from '@/lib/userProfileDB'
 import { nip19 } from 'nostr-tools'
+import { useApna } from '@/components/providers/ApnaProvider'
+import { IUserMetadata } from '@apna/sdk'
+
+// List of suggested user npubs
+const suggestedUserNpubs = [
+  "npub1w46mjnagz9f0u556fzva8ypfftc5yfm32n8ygqmd2r32mxw4cfnsvkvy9e",
+  "npub12rv5lskctqxxs2c8rf2zlzc7xx3qpvzs3w4etgemauy9thegr43sf485vg",
+  "npub1gcxzte5zlkncx26j68ez60fzkvtkm9e0vrwdcvsjakxf9mu9qewqlfnj5z",
+  "npub1xtscya34g58tk0z605fvr788k263gsu6cy9x0mhnm87echrgufzsevkk5s",
+  "npub1qny3tkh0acurzla8x3zy4nhrjz5zd8l9sy9jys09umwng00manysew95gx"
+]
 
 export function Search() {
+  const { nostr } = useApna()
+  const [suggestedUsers, setSuggestedUsers] = useState<Array<{
+    pubkey: string;
+    npub: string;
+    metadata?: IUserMetadata;
+  }>>([])
+
+  // Fetch user profiles on component mount
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      const users = await Promise.all(
+        suggestedUserNpubs.map(async (npub) => {
+          try {
+            const decoded = nip19.decode(npub)
+            if (decoded.type === 'npub') {
+              // Try userProfileDB first
+              const result = await userProfileDB.getProfile(decoded.data)
+              if (result?.profile) {
+                return {
+                  pubkey: decoded.data,
+                  npub,
+                  metadata: result.profile.metadata
+                }
+              }
+              // Fallback to apna.nostr.fetchUserMetadata
+              const metadata = await nostr.fetchUserMetadata(npub)
+              return {
+                pubkey: decoded.data,
+                npub,
+                metadata
+              }
+            }
+          } catch (e) {
+            console.error('Error fetching profile:', e)
+          }
+          return { pubkey: npub, npub }
+        })
+      )
+      setSuggestedUsers(users.filter(user => user !== undefined))
+    }
+    fetchProfiles()
+  }, [nostr])
+
   const router = useRouter()
   const [searchInput, setSearchInput] = useState('')
   const [scanning, setScanning] = useState(false)
@@ -170,6 +224,42 @@ export function Search() {
 
       {error && (
         <p className="text-red-500 text-sm">{error}</p>
+      )}
+
+      {suggestedUsers.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold mb-4">Suggested users to follow</h2>
+          <div className="space-y-4">
+            {suggestedUsers.map((user) => (
+              <div
+                key={user.npub}
+                onClick={() => {
+                  const decoded = nip19.decode(user.npub)
+                  if (decoded.type === 'npub') {
+                    router.push(`/user/${decoded.data}`)
+                  }
+                }}
+                className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <span className="text-primary font-semibold">
+                      {user.metadata?.name?.[0] || user.npub[5].toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="font-medium">
+                      {user.metadata?.name || 'Anonymous'}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {user.metadata?.about || 'No bio'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )
