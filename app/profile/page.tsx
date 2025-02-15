@@ -59,7 +59,7 @@ export default function ProfilePage() {
   if (!profile) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container max-w-screen-md py-4 px-4">
+        <div className="max-w-screen-md mx-2 py-4">
           <div className="text-center py-8 text-muted-foreground">
             Loading profile...
           </div>
@@ -71,7 +71,7 @@ export default function ProfilePage() {
   return (
     <>
       <div className="min-h-screen bg-background">
-      <div className="container max-w-screen-md py-4 px-4">
+      <div className="max-w-screen-md mx-2 py-4">
         {/* Profile Header */}
         <div className="mb-6">
           {isEditing ? (

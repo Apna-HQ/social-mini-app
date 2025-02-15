@@ -23,7 +23,8 @@ const ReplyForm = ({ noteId, onSubmit }: { noteId: string; onSubmit: (content: s
   }
 
   return (
-    <div className="mt-4 mb-6 ml-12 space-y-2">
+    <div className="mt-4 mb-6 ml-3 pl-3 relative space-y-2">
+      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-border" />
       <Textarea
         placeholder="Write your reply..."
         value={content}
@@ -124,7 +125,10 @@ export default function ThreadPage() {
     }, [isTarget]);
 
     return (
-      <div ref={noteRef} style={{ marginLeft: `${level * 24}px` }}>
+      <div ref={noteRef} className={`relative ${level > 0 ? 'pl-3 ml-3' : ''}`}>
+        {level > 0 && (
+          <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-border" />
+        )}
         <Post
           {...noteToPostProps(note, {
             onReply: () => {
@@ -148,7 +152,7 @@ export default function ThreadPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container max-w-screen-md py-4">
+        <div className="max-w-screen-md mx-2 py-4">
           <div className="flex items-center gap-4 mb-4">
             <Button variant="ghost" size="icon" onClick={() => router.back()}>
               <ArrowLeft className="w-5 h-5" />
@@ -222,7 +226,7 @@ export default function ThreadPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container max-w-screen-md py-4">
+      <div className="max-w-screen-md mx-2 py-4">
         <div className="flex items-center gap-4 mb-4">
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="w-5 h-5" />
