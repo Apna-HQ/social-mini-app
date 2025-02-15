@@ -6,6 +6,7 @@ import { Post } from "@/components/ui/post"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft } from "lucide-react"
 import { userProfileDB } from "@/lib/userProfileDB"
@@ -145,9 +146,12 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
         {/* Profile Header */}
         <div className="mb-6">
           <div className="flex items-center gap-4">
-            <div className="w-20 h-20 rounded-full bg-accent flex items-center justify-center text-2xl font-bold">
-              {userProfile.metadata.name?.[0] || "U"}
-            </div>
+            <Avatar className="w-20 h-20 text-2xl">
+              <AvatarImage src={userProfile.metadata.picture} alt="Profile" />
+              <AvatarFallback className="text-2xl font-bold">
+                {userProfile.metadata.name?.[0] || "U"}
+              </AvatarFallback>
+            </Avatar>
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold">{userProfile.metadata.name || "Unknown"}</h1>

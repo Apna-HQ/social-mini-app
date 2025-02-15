@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Fab } from "@/components/ui/fab"
 import { DynamicEditProfile } from "@/components/ui/dynamic-edit-profile"
 import { useEffect, useState } from "react"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 export default function ProfilePage() {
   const { profile, updateProfileMetadata, publishNote } = useApp()
@@ -76,9 +77,12 @@ export default function ProfilePage() {
           {isEditing ? (
             <div className="space-y-4">
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 rounded-full bg-accent flex items-center justify-center text-2xl font-bold">
-                  {editForm.name?.[0] || profile.metadata.name?.[0] || "U"}
-                </div>
+                <Avatar className="w-20 h-20 text-2xl">
+                  <AvatarImage src={profile.metadata.picture} alt="Profile" />
+                  <AvatarFallback className="text-2xl font-bold">
+                    {editForm.name?.[0] || profile.metadata.name?.[0] || "U"}
+                  </AvatarFallback>
+                </Avatar>
                 <div className="flex-1">
                   <input
                     type="text"
@@ -134,9 +138,12 @@ export default function ProfilePage() {
           ) : (
             <>
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 rounded-full bg-accent flex items-center justify-center text-2xl font-bold">
-                  {profile.metadata.name?.[0] || "U"}
-                </div>
+                <Avatar className="w-20 h-20 text-2xl">
+                  <AvatarImage src={profile.metadata.picture} alt="Profile" />
+                  <AvatarFallback className="text-2xl font-bold">
+                    {profile.metadata.name?.[0] || "U"}
+                  </AvatarFallback>
+                </Avatar>
                 <div className="flex-1">
                   <h1 className="text-2xl font-bold">{profile.metadata.name || "Unknown"}</h1>
                   <p className="text-sm text-muted-foreground break-all">{profile.pubkey}</p>
@@ -214,9 +221,12 @@ export default function ProfilePage() {
             {profile.followers.length > 0 ? (
               profile.followers.map((pubkey) => (
                 <div key={pubkey} className="flex items-center gap-4 p-4 rounded-lg border">
-                  <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-lg font-bold">
-                    {(userMetadata[pubkey]?.name?.[0] || pubkey.slice(0, 1)).toUpperCase()}
-                  </div>
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={userMetadata[pubkey]?.picture} alt="Profile" />
+                    <AvatarFallback className="text-lg font-bold">
+                      {(userMetadata[pubkey]?.name?.[0] || pubkey.slice(0, 1)).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{userMetadata[pubkey]?.name || pubkey.slice(0, 8)}</p>
                     <p className="text-sm text-muted-foreground truncate">{userMetadata[pubkey]?.about || pubkey}</p>
@@ -234,9 +244,12 @@ export default function ProfilePage() {
             {profile.following.length > 0 ? (
               profile.following.map((pubkey) => (
                 <div key={pubkey} className="flex items-center gap-4 p-4 rounded-lg border">
-                  <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-lg font-bold">
-                    {(userMetadata[pubkey]?.name?.[0] || pubkey.slice(0, 1)).toUpperCase()}
-                  </div>
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={userMetadata[pubkey]?.picture} alt="Profile" />
+                    <AvatarFallback className="text-lg font-bold">
+                      {(userMetadata[pubkey]?.name?.[0] || pubkey.slice(0, 1)).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{userMetadata[pubkey]?.name || pubkey.slice(0, 8)}</p>
                     <p className="text-sm text-muted-foreground truncate">{userMetadata[pubkey]?.about || pubkey}</p>
