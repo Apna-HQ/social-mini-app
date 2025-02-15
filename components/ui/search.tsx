@@ -6,6 +6,7 @@ import { Button } from './button'
 import { userProfileDB } from '@/lib/userProfileDB'
 import { nip19 } from 'nostr-tools'
 import { useApna } from '@/components/providers/ApnaProvider'
+import { UserProfileCard } from './user-profile-card'
 import { IUserMetadata } from '@apna/sdk'
 
 // List of suggested user npubs
@@ -231,32 +232,19 @@ export function Search() {
           <h2 className="text-lg font-semibold mb-4">Suggested users to follow</h2>
           <div className="space-y-4">
             {suggestedUsers.map((user) => (
-              <div
+              <UserProfileCard
                 key={user.npub}
+                pubkey={user.pubkey}
+                name={user.metadata?.name}
+                about={user.metadata?.about}
+                picture={user.metadata?.picture}
                 onClick={() => {
                   const decoded = nip19.decode(user.npub)
                   if (decoded.type === 'npub') {
                     router.push(`/user/${decoded.data}`)
                   }
                 }}
-                className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    <span className="text-primary font-semibold">
-                      {user.metadata?.name?.[0] || user.npub[5].toUpperCase()}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="font-medium">
-                      {user.metadata?.name || 'Anonymous'}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      {user.metadata?.about || 'No bio'}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              />
             ))}
           </div>
         </div>

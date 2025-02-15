@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft } from "lucide-react"
 import { userProfileDB } from "@/lib/userProfileDB"
+import { UserProfileCard } from "@/components/ui/user-profile-card"
 
 export const dynamic = 'force-dynamic'
 
@@ -237,19 +238,26 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
           <TabsContent value="followers" className="mt-4 space-y-4">
             {userProfile.followers.length > 0 ? (
               userProfile.followers.map((pubkey) => (
-                <div
+                <UserProfileCard
                   key={pubkey}
-                  className="flex items-center gap-4 p-4 rounded-lg border cursor-pointer hover:bg-accent/5"
-                  onClick={() => router.push(`/user/${pubkey}`)}
-                >
-                  <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-lg font-bold">
-                    {(userMetadata[pubkey]?.name?.[0] || pubkey.slice(0, 1)).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{userMetadata[pubkey]?.name || pubkey.slice(0, 8)}</p>
-                    <p className="text-sm text-muted-foreground truncate">{userMetadata[pubkey]?.about || pubkey}</p>
-                  </div>
-                </div>
+                  pubkey={pubkey}
+                  name={userMetadata[pubkey]?.name}
+                  about={userMetadata[pubkey]?.about}
+                  picture={userMetadata[pubkey]?.picture}
+                  showFollowButton={!!profile}
+                  isFollowing={profile?.following.includes(pubkey)}
+                  onFollowToggle={async () => {
+                    try {
+                      if (profile?.following.includes(pubkey)) {
+                        await nostr.unfollowUser(pubkey);
+                      } else {
+                        await nostr.followUser(pubkey);
+                      }
+                    } catch (error) {
+                      console.error("Failed to follow/unfollow user:", error);
+                    }
+                  }}
+                />
               ))
             ) : (
               <div className="text-center py-8 text-muted-foreground">
@@ -261,19 +269,26 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
           <TabsContent value="following" className="mt-4 space-y-4">
             {userProfile.following.length > 0 ? (
               userProfile.following.map((pubkey) => (
-                <div
+                <UserProfileCard
                   key={pubkey}
-                  className="flex items-center gap-4 p-4 rounded-lg border cursor-pointer hover:bg-accent/5"
-                  onClick={() => router.push(`/user/${pubkey}`)}
-                >
-                  <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center text-lg font-bold">
-                    {(userMetadata[pubkey]?.name?.[0] || pubkey.slice(0, 1)).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{userMetadata[pubkey]?.name || pubkey.slice(0, 8)}</p>
-                    <p className="text-sm text-muted-foreground truncate">{userMetadata[pubkey]?.about || pubkey}</p>
-                  </div>
-                </div>
+                  pubkey={pubkey}
+                  name={userMetadata[pubkey]?.name}
+                  about={userMetadata[pubkey]?.about}
+                  picture={userMetadata[pubkey]?.picture}
+                  showFollowButton={!!profile}
+                  isFollowing={profile?.following.includes(pubkey)}
+                  onFollowToggle={async () => {
+                    try {
+                      if (profile?.following.includes(pubkey)) {
+                        await nostr.unfollowUser(pubkey);
+                      } else {
+                        await nostr.followUser(pubkey);
+                      }
+                    } catch (error) {
+                      console.error("Failed to follow/unfollow user:", error);
+                    }
+                  }}
+                />
               ))
             ) : (
               <div className="text-center py-8 text-muted-foreground">
