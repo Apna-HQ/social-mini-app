@@ -1,10 +1,13 @@
 "use client"
 import { useState } from "react"
-import { Card, CardContent, CardFooter, CardHeader } from "./card"
+import { useRouter } from "next/navigation"
 import { Heart, MessageCircle, Repeat2, ChevronDown, ChevronUp } from "lucide-react"
+
+import { Card, CardContent, CardFooter, CardHeader } from "./card"
 import { AuthorInfo } from "./author-info"
 
-interface PostProps {
+export interface PostProps {
+  id: string
   content: string
   author: {
     name?: string
@@ -18,15 +21,11 @@ interface PostProps {
   isReply?: boolean
 }
 
-import { useRouter } from "next/navigation"
-
-export function Post({ content, author, timestamp, onLike, onRepost, onReply, id, isReply }: PostProps & { id?: string }) {
+export function Post({ id, content, author, timestamp, onLike, onRepost, onReply, isReply }: PostProps) {
   const router = useRouter()
   
   const handleClick = () => {
-    if (id) {
-      router.push(`/note/${id}`)
-    }
+    router.push(`/note/${id}`)
   }
 
   const handleAction = (e: React.MouseEvent, action?: () => void) => {
@@ -66,7 +65,10 @@ export function Post({ content, author, timestamp, onLike, onRepost, onReply, id
           </p>
           {shouldTruncate && (
             <button
-              onClick={() => setIsExpanded(!isExpanded)}
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsExpanded(!isExpanded)
+              }}
               className="text-primary hover:text-primary/90 text-sm font-medium flex items-center gap-1 mt-2"
             >
               {isExpanded ? (

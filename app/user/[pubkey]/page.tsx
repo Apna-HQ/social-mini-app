@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { ChevronLeft } from "lucide-react"
 import { userProfileDB } from "@/lib/userProfileDB"
 import { UserProfileCard } from "@/components/ui/user-profile-card"
+import { noteToPostProps } from "@/lib/utils/post"
 
 export const dynamic = 'force-dynamic'
 
@@ -218,14 +219,11 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
               userNotes.map((note) => (
                 <Post
                   key={note.id}
-                  id={note.id}
-                  content={note.content}
-                  author={{
-                    name: userProfile.metadata.name || note.pubkey.slice(0, 8),
-                    picture: userProfile.metadata.picture,
-                    pubkey: note.pubkey
-                  }}
-                  timestamp={note.created_at}
+                  {...noteToPostProps(note, {
+                    onLike: () => nostr.likeNote(note.id),
+                    onRepost: () => nostr.repostNote(note.id, ''),
+                    onReply: () => router.push(`/note/${note.id}`)
+                  })}
                 />
               ))
             ) : (

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft } from "lucide-react"
 import type { INote, INoteReply } from "@apna/sdk"
+import { noteToPostProps } from "@/lib/utils/post"
 
 export const dynamic = 'force-dynamic'
 
@@ -125,20 +126,14 @@ export default function ThreadPage() {
     return (
       <div ref={noteRef} style={{ marginLeft: `${level * 24}px` }}>
         <Post
-          id={undefined} // Prevent navigation by not passing the id
-          content={note.content}
-          author={{
-            name: note.pubkey.slice(0, 8),
-            picture: undefined,
-            pubkey: note.pubkey
-          }}
-          timestamp={note.created_at}
-          onReply={() => {
-            if (noteRef.current) {
-              noteRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          {...noteToPostProps(note, {
+            onReply: () => {
+              if (noteRef.current) {
+                noteRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+              setReplyingTo(note.id);
             }
-            setReplyingTo(note.id);
-          }}
+          })}
         />
         {replyingTo === note.id && (
           <ReplyForm 

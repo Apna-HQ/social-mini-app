@@ -5,6 +5,7 @@ import { Fab } from "@/components/ui/fab"
 import { useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import type { INote } from "@apna/sdk"
+import { noteToPostProps } from "@/lib/utils/post"
 
 export default function Home() {
   const router = useRouter()
@@ -119,23 +120,11 @@ export default function Home() {
           {notes.map((note: INote) => (
             <Post
               key={note.id}
-              id={note.id}
-              content={note.content}
-              author={{
-                name: note.pubkey.slice(0, 8),
-                picture: undefined,
-                pubkey: note.pubkey
-              }}
-              timestamp={note.created_at}
-              onLike={() => likeNote(note.id)}
-              onRepost={() => repostNote(note.id)}
-              onReply={() => router.push(`/note/${note.id}`)}
-              // @ts-ignore
-              isReply={note.tags?.some(tag =>
-                Array.isArray(tag) &&
-                tag[0] === "e" &&
-                (tag[3] === "reply" || tag[3] === "root")
-              )}
+              {...noteToPostProps(note, {
+                onLike: () => likeNote(note.id),
+                onRepost: () => repostNote(note.id),
+                onReply: () => router.push(`/note/${note.id}`)
+              })}
             />
           ))}
           {notes.length === 0 && (
