@@ -23,8 +23,10 @@ const ReplyForm = ({ noteId, onSubmit }: { noteId: string; onSubmit: (content: s
   }
 
   return (
-    <div className="mt-4 mb-6 ml-3 pl-3 relative space-y-2">
-      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-border" />
+    <div className="mt-4 mb-6 pl-3 relative space-y-2">
+      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-border" style={{
+        left: '0px'
+      }} />
       <Textarea
         placeholder="Write your reply..."
         value={content}
@@ -125,9 +127,11 @@ export default function ThreadPage() {
     }, [isTarget]);
 
     return (
-      <div ref={noteRef} className={`relative ${level > 0 ? 'pl-3 ml-3' : ''}`}>
+      <div ref={noteRef} className={`relative ${level > 0 ? 'pl-3' : ''}`}>
         {level > 0 && (
-          <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-border" />
+          <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-border" style={{
+            left: `${(level - 1) * 12}px`
+          }} />
         )}
         <Post
           {...noteToPostProps(note, {
@@ -214,9 +218,11 @@ export default function ThreadPage() {
     const renderReplies = (parentId: string, level: number = 0) => {
       const children = replyMap.get(parentId) || [];
       return children.map((reply) => (
-        <div key={reply.id}>
+        <div key={reply.id} className="relative">
           <NotePost note={reply} level={level} isTarget={reply.id === id} />
-          {renderReplies(reply.id, level + 1)}
+          <div className={level > 0 ? 'ml-3' : ''}>
+            {renderReplies(reply.id, level + 1)}
+          </div>
         </div>
       ));
     };
