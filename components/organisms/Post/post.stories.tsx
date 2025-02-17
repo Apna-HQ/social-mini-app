@@ -41,7 +41,15 @@ const baseProps = {
 
 const longContent = `This is a much longer post that demonstrates how the component handles larger amounts of text. It might include multiple sentences and even some line breaks.
 
-It could also include some #hashtags and @mentions to show how those are styled. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.`;
+It could also include some #hashtags and references to other posts like nostr:abc123def456 to show how those are rendered. Lorem ipsum dolor sit amet, consectetur adipiscing elit.`;
+
+const contentWithImageAndNote = `Check out this image!
+https://github.com/shadcn.png
+
+And this interesting post:
+nostr:abc123def456
+
+#photography #social`;
 
 export const Default: Story = {
   render: () => <Post {...baseProps} />,
@@ -49,10 +57,21 @@ export const Default: Story = {
 
 export const WithImage: Story = {
   render: () => (
-    <Post 
-      {...baseProps} 
+    <Post
+      {...baseProps}
       id="test-post-2"
-      content="Check out this image! https://picsum.photos/400/300" 
+      content="Check out this image! https://github.com/shadcn.png"
+    />
+  ),
+};
+
+export const WithRichContent: Story = {
+  render: () => (
+    <Post
+      {...baseProps}
+      id="test-post-3"
+      content={contentWithImageAndNote}
+      onHashtagClick={(hashtag) => console.log('Hashtag clicked:', hashtag)}
     />
   ),
 };

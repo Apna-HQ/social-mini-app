@@ -5,6 +5,7 @@ import { Heart, MessageCircle, Repeat2, ChevronDown, ChevronUp } from "lucide-re
 
 import { Card, CardContent, CardFooter, CardHeader } from "./card"
 import { AuthorInfo } from "./author-info"
+import { ContentRenderer } from "./content-renderer"
 
 export interface PostProps {
   id: string
@@ -18,10 +19,21 @@ export interface PostProps {
   onLike?: () => void
   onRepost?: () => void
   onReply?: () => void
+  onHashtagClick?: (hashtag: string) => void
   isReply?: boolean
 }
 
-export function Post({ id, content, author, timestamp, onLike, onRepost, onReply, isReply }: PostProps) {
+export function Post({
+  id,
+  content,
+  author,
+  timestamp,
+  onLike,
+  onRepost,
+  onReply,
+  onHashtagClick,
+  isReply,
+}: PostProps) {
   const router = useRouter()
   
   const handleClick = () => {
@@ -60,9 +72,12 @@ export function Post({ id, content, author, timestamp, onLike, onRepost, onReply
               reply
             </span>
           )}
-          <p className={`whitespace-pre-wrap break-words ${!isExpanded && shouldTruncate ? "line-clamp-4" : ""}`}>
-            {content}
-          </p>
+          <div className={!isExpanded && shouldTruncate ? "max-h-[120px] overflow-hidden" : ""}>
+            <ContentRenderer
+              content={content}
+              onHashtagClick={onHashtagClick}
+            />
+          </div>
           {shouldTruncate && (
             <button
               onClick={(e) => {
