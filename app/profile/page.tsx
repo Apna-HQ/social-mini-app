@@ -3,6 +3,8 @@
 import { useApp } from "../providers"
 import { useApna } from "@/components/providers/ApnaProvider"
 import { Post } from "@/components/ui/post"
+import { noteToPostProps } from "@/lib/utils/post"
+import { useRouter } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Fab } from "@/components/ui/fab"
 import { DynamicEditProfile } from "@/components/ui/dynamic-edit-profile"
@@ -10,7 +12,8 @@ import { useEffect, useState } from "react"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 export default function ProfilePage() {
-  const { profile, updateProfileMetadata, publishNote } = useApp()
+  const router = useRouter()
+  const { profile, updateProfileMetadata, publishNote, likeNote, replyToNote } = useApp()
   const { nostr } = useApna()
   const [userNotes, setUserNotes] = useState<any[]>([])
   const [userMetadata, setUserMetadata] = useState<Record<string, any>>({})
@@ -200,14 +203,11 @@ export default function ProfilePage() {
               userNotes.map((note) => (
                 <Post
                   key={note.id}
-                  id={note.id}
-                  content={note.content}
-                  author={{
-                    name: profile.metadata.name || note.pubkey.slice(0, 8),
-                    picture: profile.metadata.picture,
-                    pubkey: note.pubkey
-                  }}
-                  timestamp={note.created_at}
+                  {...noteToPostProps(note, {
+                    onLike: () => likeNote(note.id),
+                    onRepost: () => nostr.repostNote(note.id, ''),
+                    onReply: () => router.push(`/note/${note.id}`)
+                  })}
                 />
               ))
             ) : (

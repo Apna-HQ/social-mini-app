@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic'
 
 export default function UserProfilePage({ params }: { params: { pubkey: string } }) {
   const router = useRouter()
-  const { profile } = useApp()
+  const { profile, likeNote, replyToNote } = useApp()
   const { nostr } = useApna()
   const [userNotes, setUserNotes] = useState<any[]>([])
   const [loadingNotes, setLoadingNotes] = useState(true)
@@ -224,7 +224,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
                 <Post
                   key={note.id}
                   {...noteToPostProps(note, {
-                    onLike: () => nostr.likeNote(note.id),
+                    onLike: () => likeNote(note.id),
                     onRepost: () => nostr.repostNote(note.id, ''),
                     onReply: () => router.push(`/note/${note.id}`)
                   })}
