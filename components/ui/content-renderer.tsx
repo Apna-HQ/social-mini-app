@@ -59,7 +59,7 @@ function parseContent(content: string): ContentSegment[] {
     } else if (matchedContent.match(imageRegex)) {
       segments.push({
         type: "image",
-        content: matchedContent
+        content: decodeURIComponent(matchedContent)
       })
     } else if (matchedContent.startsWith("#")) {
       segments.push({
