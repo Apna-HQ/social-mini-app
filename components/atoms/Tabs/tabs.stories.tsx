@@ -37,9 +37,9 @@ export const WithMultipleTabs: Story = {
           <TabsTrigger value="replies">Replies</TabsTrigger>
           <TabsTrigger value="likes">Likes</TabsTrigger>
         </TabsList>
-        <TabsContent value="posts">User's posts</TabsContent>
-        <TabsContent value="replies">User's replies</TabsContent>
-        <TabsContent value="likes">User's likes</TabsContent>
+        <TabsContent value="posts">User&apos;s posts</TabsContent>
+        <TabsContent value="replies">User&apos;s replies</TabsContent>
+        <TabsContent value="likes">User&apos;s likes</TabsContent>
       </Tabs>
     </div>
   ),
