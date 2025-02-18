@@ -8,7 +8,7 @@ import { AuthorInfo } from "./author-info"
 import { useApna } from "@/components/providers/ApnaProvider"
 
 interface ContentSegment {
-  type: "text" | "nostr" | "image" | "hashtag"
+  type: "text" | "nostr" | "image" | "hashtag" | "youtube" | "url" | "audio" | "video"
   content: string
 }
 
@@ -33,12 +33,19 @@ function parseContent(content: string): ContentSegment[] {
   let currentIndex = 0
 
   // Regular expressions for different content types
-  const nostrRegex = /nostr:([a-zA-Z0-9]+)/g
-  const imageRegex = /https?:\/\/\S+\.(jpg|jpeg|png|gif|webp)(\?\S*)?/gi
-  const hashtagRegex = /#[a-zA-Z0-9_]+/g
+  const nostrRegex = /nostr:([a-zA-Z0-9]+)/g;
+  const imageRegex = /https?:\/\/\S+\.(jpg|jpeg|png|gif|webp)(\?\S*)?/gi;
+  const hashtagRegex = /#[a-zA-Z0-9_]+/g;
+  const youtubeRegex = /(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/(watch\?v=|embed\/)?([a-zA-Z0-9_-]+)/gi;
+  const audioRegex = /https?:\/\/\S+\.(mp3|wav|ogg)(\?\S*)?/gi;
+  const videoRegex = /https?:\/\/\S+\.(mp4|webm)(\?\S*)?/gi;
+  const urlRegex = /(https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*))/gi;
 
   // Combined regex to match any of the above
-  const combinedRegex = new RegExp(`${nostrRegex.source}|${imageRegex.source}|${hashtagRegex.source}`, "gi")
+  const combinedRegex = new RegExp(
+    `${nostrRegex.source}|${imageRegex.source}|${hashtagRegex.source}|${youtubeRegex.source}|${audioRegex.source}|${videoRegex.source}`,
+    "gi"
+  )
 
   let match
   while ((match = combinedRegex.exec(content)) !== null) {
@@ -66,6 +73,22 @@ function parseContent(content: string): ContentSegment[] {
         type: "hashtag",
         content: matchedContent
       })
+    } else if (matchedContent.match(youtubeRegex)) {
+      const videoId = youtubeRegex.exec(matchedContent)?.[5] || "";
+      segments.push({
+        type: "youtube",
+        content: videoId,
+      });
+    } else if (matchedContent.match(audioRegex)) {
+      segments.push({
+        type: "audio",
+        content: matchedContent
+      })
+    } else if (matchedContent.match(videoRegex)) {
+      segments.push({
+        type: "video",
+        content: matchedContent
+      })
     }
 
     currentIndex = match.index + matchedContent.length
@@ -73,10 +96,18 @@ function parseContent(content: string): ContentSegment[] {
 
   // Add remaining text if any
   if (currentIndex < content.length) {
-    segments.push({
-      type: "text",
-      content: content.slice(currentIndex)
-    })
+    const remainingContent = content.slice(currentIndex)
+    if (remainingContent.match(urlRegex)) {
+      segments.push({
+        type: "url",
+        content: remainingContent
+      })
+    } else {
+      segments.push({
+        type: "text",
+        content: remainingContent
+      })
+    }
   }
 
   return segments
@@ -160,15 +191,14 @@ export function ContentRenderer({ content, onHashtagClick }: ContentRendererProp
             const isProfilePic = segment.content.includes("github.com/shadcn.png")
             return (
               <div key={index}
-                className={`relative rounded-lg overflow-hidden bg-muted ${
-                  isProfilePic ? "w-32 h-32" : "w-full aspect-video"
-                }`}
+                className={`relative rounded-lg overflow-hidden bg-muted`}
               >
                 <Image
                   src={segment.content}
                   alt="Post image"
-                  fill
-                  className="object-cover"
+                  width={500}
+                  height={300}
+                  style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
                 />
               </div>
             )
@@ -187,7 +217,36 @@ export function ContentRenderer({ content, onHashtagClick }: ContentRendererProp
                 {segment.content}
               </button>
             )
-
+          case "youtube":
+            return (
+              <div key={index} className="relative w-full aspect-video max-h-64">
+                <iframe
+                  src={`https://www.youtube.com/embed/${segment.content}?autoplay=1&mute=1`}
+                  title="YouTube video player"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="absolute top-0 left-0 w-full h-full"
+                />
+              </div>
+            );
+          case "url":
+            return (
+              <a key={index} href={segment.content} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-accent transition-colors">
+                {segment.content}
+              </a>
+            )
+          case "audio":
+            return (
+              <audio key={index} src={segment.content} controls autoPlay className="w-full">
+                Your browser does not support the audio element.
+              </audio>
+            )
+          case "video":
+            return (
+              <video key={index} src={segment.content} controls autoPlay className="w-full aspect-video max-h-64">
+                Your browser does not support the video element.
+              </video>
+            )
           default:
             return null
         }

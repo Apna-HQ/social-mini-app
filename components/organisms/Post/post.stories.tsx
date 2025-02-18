@@ -106,3 +106,53 @@ export const AsReply: Story = {
     />
   ),
 };
+
+export const WithYoutubeVideo: Story = {
+  render: () => (
+    <Post
+      {...baseProps}
+      id="test-post-4"
+      content="Check out this YouTube video! https://www.youtube.com/watch?v=-7cxvXxms-g"
+    />
+  ),
+};
+
+export const WithUrl: Story = {
+  render: () => (
+    <Post
+      {...baseProps}
+      id="test-post-5"
+      content="Check out this website! https://www.example.com"
+    />
+  ),
+};
+
+export const WithAudio: Story = {
+  render: () => (
+    <Post
+      {...baseProps}
+      id="test-post-6"
+      content="Listen to this audio! https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+    />
+  ),
+};
+
+export const WithVideo: Story = {
+  render: () => (
+    <Post
+      {...baseProps}
+      id="test-post-7"
+      content="Watch this video! https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+    />
+  ),
+};
+
+export const WithTallImage: Story = {
+  render: () => (
+    <Post
+      {...baseProps}
+      id="test-post-8"
+      content="Check out this tall image! https://beebom.com/wp-content/uploads/2023/07/view-edit-share-and-delete-captured-screenshots-on-iPhone.gif?w=259"
+    />
+  ),
+};
