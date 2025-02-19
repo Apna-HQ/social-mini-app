@@ -43,7 +43,8 @@ interface AppContextType {
   fetchNoteAndReplies: (id: string) => Promise<any>
   updateProfileMetadata: (metadata: { name?: string, about?: string }) => Promise<void>
   saveScrollPosition: (position: number) => void
-  savedScrollPosition: number | null
+  savedScrollPosition: number | null,
+  fetchUserProfile: (pubkey: string) => Promise<Profile | null>
 }
 
 const AppContext = createContext<AppContextType | null>(null)
@@ -331,6 +332,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const fetchUserProfile = async (pubkey: string): Promise<Profile | null> => {
+    const { userProfileDB } = await import('@/lib/userProfileDB')
+    const cachedProfile = await userProfileDB.getProfile(pubkey)
+
+    if (cachedProfile && !cachedProfile.isStale) {
+      return cachedProfile.profile
+    }
+
+    try {
+      await ensureApnaInitialized()
+      const fetchedProfile = await apna.nostr.fetchUserProfile(pubkey)
+
+      if (fetchedProfile) {
+        const profileToCache = {
+          pubkey: pubkey,
+          metadata: fetchedProfile.metadata,
+          followers: fetchedProfile.followers || [],
+          following: fetchedProfile.following || []
+        }
+        await userProfileDB.updateProfile(profileToCache)
+
+        return {
+          metadata: fetchedProfile.metadata,
+          pubkey: pubkey,
+          stats: {
+            posts: 0
+          },
+          followers: fetchedProfile.followers || [],
+          following: fetchedProfile.following || []
+        }
+      }
+
+      return null
+    } catch (error) {
+      console.error("Failed to fetch user profile:", error)
+      return null
+    }
+  }
+
   return (
     <AppContext.Provider value={{
       notes,
@@ -347,7 +387,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       fetchNoteAndReplies,
       updateProfileMetadata,
       saveScrollPosition,
-      savedScrollPosition
+      savedScrollPosition,
+      fetchUserProfile
     }}>
       {children}
     </AppContext.Provider>
