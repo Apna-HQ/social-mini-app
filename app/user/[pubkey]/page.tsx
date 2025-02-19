@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic'
 
 export default function UserProfilePage({ params }: { params: { pubkey: string } }) {
   const router = useRouter()
-  const { profile, likeNote, replyToNote } = useApp()
+  const { profile, likeNote, replyToNote, fetchUserProfile } = useApp()
   const { nostr } = useApna()
   const [userNotes, setUserNotes] = useState<any[]>([])
   const [loadingNotes, setLoadingNotes] = useState(true)
@@ -51,10 +51,10 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
           await Promise.all(
             allUsers.map(async (pubkey) => {
               try {
-                const userMetadata = await nostr.fetchUserMetadata(pubkey)
-                metadata[pubkey] = userMetadata
+                const userProfile = await fetchUserProfile(pubkey)
+                metadata[pubkey] = userProfile?.metadata
               } catch (error) {
-                console.error(`Failed to fetch metadata for ${pubkey}:`, error)
+                console.error(`Failed to fetch profile for ${pubkey}:`, error)
               }
             })
           )
@@ -101,10 +101,10 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
         await Promise.all(
           allUsers.map(async (pubkey) => {
             try {
-              const userMetadata = await nostr.fetchUserMetadata(pubkey)
-              metadata[pubkey] = userMetadata
+              const userProfile = await fetchUserProfile(pubkey)
+              metadata[pubkey] = userProfile?.metadata
             } catch (error) {
-              console.error(`Failed to fetch metadata for ${pubkey}:`, error)
+              console.error(`Failed to fetch profile for ${pubkey}:`, error)
             }
           })
         )

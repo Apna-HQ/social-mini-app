@@ -20,9 +20,9 @@ interface UserProfileDBSchema extends DBSchema {
   }
 }
 
-export const MAX_CACHE_AGE_HOURS = 24 // Cache profiles for 24 hours
-export const MAX_CACHE_ITEMS = 1000 // Maximum number of profiles to keep in cache
-export const STALE_AFTER_MINUTES = 30 // Consider data stale after 30 minutes
+export const MAX_CACHE_AGE_HOURS = 25 // Cache profiles for 1 hour
+export const MAX_CACHE_ITEMS = 10000 // Maximum number of profiles to keep in cache
+export const STALE_AFTER_MINUTES = 1440 // Consider data stale after 1440 minutes
 
 class UserProfileDB {
   private dbName = 'social-mini-app-profiles'
