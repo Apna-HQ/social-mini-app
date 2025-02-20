@@ -23,7 +23,7 @@ export function Search() {
   const [suggestedUsers, setSuggestedUsers] = useState<Array<{
     pubkey: string;
     npub: string;
-    metadata?: IUserMetadata;
+    // metadata?: IUserMetadata;
   }>>([])
 
   // Fetch user profiles on component mount
@@ -35,20 +35,20 @@ export function Search() {
             const decoded = nip19.decode(npub)
             if (decoded.type === 'npub') {
               // Try userProfileDB first
-              const result = await userProfileDB.getProfile(decoded.data)
-              if (result?.profile) {
-                return {
-                  pubkey: decoded.data,
-                  npub,
-                  metadata: result.profile.metadata
-                }
-              }
+              // const result = await userProfileDB.getProfile(decoded.data)
+              // if (result?.profile) {
+              //   return {
+              //     pubkey: decoded.data,
+              //     npub,
+              //     // metadata: result.profile.metadata
+              //   }
+              // }
               // Fallback to apna.nostr.fetchUserMetadata
-              const metadata = await nostr.fetchUserMetadata(npub)
+              // const metadata = await nostr.fetchUserMetadata(npub)
               return {
                 pubkey: decoded.data,
                 npub,
-                metadata
+                // metadata
               }
             }
           } catch (e) {
