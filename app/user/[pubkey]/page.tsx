@@ -6,37 +6,40 @@ import { Post } from "@/components/ui/post"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft } from "lucide-react"
-import { userProfileDB } from "@/lib/userProfileDB"
 import { UserProfileCard } from "@/components/ui/user-profile-card"
 import { noteToPostProps } from "@/lib/utils/post"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { userProfileDB } from "@/lib/userProfileDB"
+import type { INote } from "@apna/sdk"
 
 export const dynamic = 'force-dynamic'
 
+interface UserProfile {
+  metadata: {
+    name?: string
+    about?: string
+    picture?: string
+  }
+  followers: string[]
+  following: string[]
+  pubkey: string
+}
+
 export default function UserProfilePage({ params }: { params: { pubkey: string } }) {
   const router = useRouter()
-  const { profile, likeNote, replyToNote, fetchUserProfile } = useApp()
+  const { likeNote, profile } = useApp()
   const { nostr } = useApna()
-  const [userNotes, setUserNotes] = useState<any[]>([])
+  const [userNotes, setUserNotes] = useState<INote[]>([])
   const [loadingNotes, setLoadingNotes] = useState(true)
-  const [userProfile, setUserProfile] = useState<{
-    metadata: {
-      name?: string;
-      about?: string;
-      picture?: string;
-    };
-    followers: string[];
-    following: string[];
-  } | null>(null)
-  const [userMetadata, setUserMetadata] = useState<Record<string, any>>({})
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isStale, setIsStale] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Check cache first
+        // Check cache first for profile
         const cachedData = await userProfileDB.getProfile(params.pubkey)
         
         if (cachedData) {
@@ -44,36 +47,20 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
           setUserProfile(cachedData.profile)
           setIsStale(cachedData.isStale)
           
-          // Fetch metadata for followers and following from cached data
-          const metadata: Record<string, any> = {}
-          const allUsers = Array.from(new Set([...cachedData.profile.followers, ...cachedData.profile.following]))
-          
-          await Promise.all(
-            allUsers.map(async (pubkey) => {
-              try {
-                const userProfile = await fetchUserProfile(pubkey)
-                metadata[pubkey] = userProfile?.metadata
-              } catch (error) {
-                console.error(`Failed to fetch profile for ${pubkey}:`, error)
-              }
-            })
-          )
-          
-          setUserMetadata(metadata)
-          
-          // If data is stale, fetch fresh data in background
-          if (cachedData.isStale) {
-            fetchFreshData()
-          }
+          fetchFreshProfile()
+          // // If data is stale, fetch fresh data in background
+          // if (cachedData.isStale) {
+          //   fetchFreshProfile()
+          // }
         } else {
           // No cache, fetch fresh data
-          await fetchFreshData()
+          await fetchFreshProfile()
         }
 
-        // Fetch user's notes
-        const notes = await nostr.fetchUserFeed(params.pubkey, 'NOTES_FEED', undefined, undefined, 20)
+        // Fetch user's notes and filter for kind 1 (text notes)
+        const events = await nostr.fetchUserFeed(params.pubkey, 'NOTES_FEED', undefined, undefined, 20)
+        const notes = events.filter((event): event is INote => event.kind === 1)
         setUserNotes(notes)
-
       } catch (error) {
         console.error("Failed to fetch user data:", error)
       } finally {
@@ -81,7 +68,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
       }
     }
 
-    const fetchFreshData = async () => {
+    const fetchFreshProfile = async () => {
       try {
         const freshProfile = await nostr.fetchUserProfile(params.pubkey)
         const profileWithPubkey = {
@@ -93,30 +80,13 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
 
         // Update cache
         await userProfileDB.updateProfile(profileWithPubkey)
-
-        // Fetch metadata for followers and following
-        const metadata: Record<string, any> = {}
-        const allUsers = Array.from(new Set([...freshProfile.followers, ...freshProfile.following]))
-
-        await Promise.all(
-          allUsers.map(async (pubkey) => {
-            try {
-              const userProfile = await fetchUserProfile(pubkey)
-              metadata[pubkey] = userProfile?.metadata
-            } catch (error) {
-              console.error(`Failed to fetch profile for ${pubkey}:`, error)
-            }
-          })
-        )
-
-        setUserMetadata(metadata)
       } catch (error) {
-        console.error("Failed to fetch fresh data:", error)
+        console.error("Failed to fetch fresh profile:", error)
       }
     }
 
     fetchData()
-  }, [params.pubkey])
+  }, [params.pubkey, nostr])
 
   if (!userProfile) {
     return (
@@ -162,27 +132,27 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
                 )}
               </div>
               <p className="text-sm text-muted-foreground break-all">{params.pubkey}</p>
+              {profile && profile.pubkey !== params.pubkey && (
+                <Button
+                  className="mt-4"
+                  variant={profile.following.includes(params.pubkey) ? "outline" : "default"}
+                  onClick={async () => {
+                    try {
+                      if (profile.following.includes(params.pubkey)) {
+                        await nostr.unfollowUser(params.pubkey)
+                      } else {
+                        await nostr.followUser(params.pubkey)
+                      }
+                    } catch (error) {
+                      console.error("Failed to follow/unfollow user:", error)
+                    }
+                  }}
+                >
+                  {profile.following.includes(params.pubkey) ? "Unfollow" : "Follow"}
+                </Button>
+              )}
             </div>
           </div>
-          {profile && profile.pubkey !== params.pubkey && (
-            <Button
-              className="mt-4 ml-24"
-              variant={profile.following.includes(params.pubkey) ? "outline" : "default"}
-              onClick={async () => {
-                try {
-                  if (profile.following.includes(params.pubkey)) {
-                    await nostr.unfollowUser(params.pubkey);
-                  } else {
-                    await nostr.followUser(params.pubkey);
-                  }
-                } catch (error) {
-                  console.error("Failed to follow/unfollow user:", error);
-                }
-              }}
-            >
-              {profile.following.includes(params.pubkey) ? "Unfollow" : "Follow"}
-            </Button>
-          )}
           
           {/* Bio */}
           {userProfile.metadata.about && (
@@ -240,26 +210,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
           <TabsContent value="followers" className="mt-4 space-y-4">
             {userProfile.followers.length > 0 ? (
               userProfile.followers.map((pubkey) => (
-                <UserProfileCard
-                  key={pubkey}
-                  pubkey={pubkey}
-                  name={userMetadata[pubkey]?.name}
-                  about={userMetadata[pubkey]?.about}
-                  picture={userMetadata[pubkey]?.picture}
-                  showFollowButton={!!profile}
-                  isFollowing={profile?.following.includes(pubkey)}
-                  onFollowToggle={async () => {
-                    try {
-                      if (profile?.following.includes(pubkey)) {
-                        await nostr.unfollowUser(pubkey);
-                      } else {
-                        await nostr.followUser(pubkey);
-                      }
-                    } catch (error) {
-                      console.error("Failed to follow/unfollow user:", error);
-                    }
-                  }}
-                />
+                <UserProfileCard key={pubkey} pubkey={pubkey} />
               ))
             ) : (
               <div className="text-center py-8 text-muted-foreground">
@@ -271,26 +222,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
           <TabsContent value="following" className="mt-4 space-y-4">
             {userProfile.following.length > 0 ? (
               userProfile.following.map((pubkey) => (
-                <UserProfileCard
-                  key={pubkey}
-                  pubkey={pubkey}
-                  name={userMetadata[pubkey]?.name}
-                  about={userMetadata[pubkey]?.about}
-                  picture={userMetadata[pubkey]?.picture}
-                  showFollowButton={!!profile}
-                  isFollowing={profile?.following.includes(pubkey)}
-                  onFollowToggle={async () => {
-                    try {
-                      if (profile?.following.includes(pubkey)) {
-                        await nostr.unfollowUser(pubkey);
-                      } else {
-                        await nostr.followUser(pubkey);
-                      }
-                    } catch (error) {
-                      console.error("Failed to follow/unfollow user:", error);
-                    }
-                  }}
-                />
+                <UserProfileCard key={pubkey} pubkey={pubkey} />
               ))
             ) : (
               <div className="text-center py-8 text-muted-foreground">
