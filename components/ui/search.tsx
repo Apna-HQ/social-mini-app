@@ -235,15 +235,6 @@ export function Search() {
               <UserProfileCard
                 key={user.npub}
                 pubkey={user.pubkey}
-                name={user.metadata?.name}
-                about={user.metadata?.about}
-                picture={user.metadata?.picture}
-                onClick={() => {
-                  const decoded = nip19.decode(user.npub)
-                  if (decoded.type === 'npub') {
-                    router.push(`/user/${decoded.data}`)
-                  }
-                }}
               />
             ))}
           </div>
