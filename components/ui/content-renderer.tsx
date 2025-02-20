@@ -58,7 +58,7 @@ function parseContent(content: string): ContentSegment[] {
     }
 
     const matchedContent = match[0]
-    if (matchedContent.startsWith("nostr:")) {
+    if (matchedContent.startsWith("nostr:note") || matchedContent.startsWith("nostr:nevent")) {
       segments.push({
         type: "nostr",
         content: matchedContent.slice(6) // Remove "nostr:" prefix
