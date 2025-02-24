@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Card, CardContent, CardHeader } from "./card"
 import { AuthorInfo } from "./author-info"
 import { useApna } from "@/components/providers/ApnaProvider"
@@ -26,6 +26,74 @@ interface ReferencedNote {
     pubkey: string
   }
   created_at: number
+}
+
+// Custom hook for handling intersection observer
+const useInView = () => {
+  const [isInView, setIsInView] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsInView(entry.isIntersecting)
+      },
+      {
+        threshold: 0.1 // Trigger when at least 10% of the element is visible
+      }
+    )
+
+    const currentRef = ref.current
+    if (currentRef) {
+      observer.observe(currentRef)
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef)
+      }
+    }
+  }, [])
+
+  return { ref, isInView }
+}
+
+// Media components that use the intersection observer
+const YouTubeEmbed = ({ videoId }: { videoId: string }) => {
+  const { ref, isInView } = useInView()
+  return (
+    <div className="relative w-full aspect-video max-h-64" ref={ref}>
+      <iframe
+        src={`https://www.youtube.com/embed/${videoId}${isInView ? '?autoplay=1&mute=1' : ''}`}
+        title="YouTube video player"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+        className="absolute top-0 left-0 w-full h-full"
+      />
+    </div>
+  )
+}
+
+const AudioPlayer = ({ src }: { src: string }) => {
+  const { ref, isInView } = useInView()
+  return (
+    <div ref={ref}>
+      <audio src={src} controls autoPlay={isInView} className="w-full">
+        Your browser does not support the audio element.
+      </audio>
+    </div>
+  )
+}
+
+const VideoPlayer = ({ src }: { src: string }) => {
+  const { ref, isInView } = useInView()
+  return (
+    <div ref={ref}>
+      <video src={src} controls autoPlay={isInView} className="w-full aspect-video max-h-64">
+        Your browser does not support the video element.
+      </video>
+    </div>
+  )
 }
 
 function parseContent(content: string): ContentSegment[] {
@@ -218,17 +286,7 @@ export function ContentRenderer({ content, onHashtagClick }: ContentRendererProp
               </button>
             )
           case "youtube":
-            return (
-              <div key={index} className="relative w-full aspect-video max-h-64">
-                <iframe
-                  src={`https://www.youtube.com/embed/${segment.content}?autoplay=1&mute=1`}
-                  title="YouTube video player"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="absolute top-0 left-0 w-full h-full"
-                />
-              </div>
-            );
+            return <YouTubeEmbed key={index} videoId={segment.content} />
           case "url":
             return (
               <a key={index} href={segment.content} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-accent transition-colors">
@@ -236,17 +294,9 @@ export function ContentRenderer({ content, onHashtagClick }: ContentRendererProp
               </a>
             )
           case "audio":
-            return (
-              <audio key={index} src={segment.content} controls autoPlay className="w-full">
-                Your browser does not support the audio element.
-              </audio>
-            )
+            return <AudioPlayer key={index} src={segment.content} />
           case "video":
-            return (
-              <video key={index} src={segment.content} controls autoPlay className="w-full aspect-video max-h-64">
-                Your browser does not support the video element.
-              </video>
-            )
+            return <VideoPlayer key={index} src={segment.content} />
           default:
             return null
         }
