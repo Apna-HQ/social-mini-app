@@ -87,7 +87,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const fetchInitialFeed = async () => {
     try {
       const { feedDB, INITIAL_FETCH_SIZE } = await import('@/lib/feedDB')
-      const cachedNotes = await feedDB.getNotes(INITIAL_FETCH_SIZE)
+      
+      // Get the active user's pubkey
+      const userProfile = await apna.nostr.getActiveUserProfile()
+      let userPubkey: string | null = null
+      
+      if (userProfile) {
+        userPubkey = (() => {
+          const decoded = nip19.decode(userProfile.nprofile) as DecodedNprofile
+          if (decoded.type === 'nprofile' && decoded.data.pubkey) {
+            // Encode the pubkey as npub and then decode it to get the hex string
+            const npub = nip19.npubEncode(decoded.data.pubkey)
+            return nip19.decode(npub).data as string
+          }
+          return null
+        })()
+      }
+      
+      if (!userPubkey) {
+        console.error("No active user pubkey found")
+        setLoading(false)
+        return
+      }
+      
+      const cachedNotes = await feedDB.getNotes(userPubkey, INITIAL_FETCH_SIZE)
       
       if (cachedNotes.length > 0) {
         setNotes(cachedNotes)
@@ -96,33 +119,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       await ensureApnaInitialized()
-      // apna.nostr.test()
-      const userProfile = await apna.nostr.getActiveUserProfile()
-      if (userProfile) {
-        setProfile({
-          metadata: userProfile.metadata,
-          pubkey: (() => {
-            const decoded = nip19.decode(userProfile.nprofile) as DecodedNprofile
-            if (decoded.type === 'nprofile' && decoded.data.pubkey) {
-              // Encode the pubkey as npub and then decode it to get the hex string
-              const npub = nip19.npubEncode(decoded.data.pubkey)
-              return nip19.decode(npub).data as string
-            }
-            throw new Error('Invalid nprofile format')
-          })(),
-          stats: {
-            posts: 0
-          },
-          followers: userProfile.followers || [],
-          following: userProfile.following || []
-        })
-      }
+      
+      // Set the profile
+      setProfile({
+        metadata: userProfile.metadata,
+        pubkey: userPubkey,
+        stats: {
+          posts: 0
+        },
+        followers: userProfile.followers || [],
+        following: userProfile.following || []
+      })
 
       const fetchSize = cachedNotes.length === 0 ? INITIAL_FETCH_SIZE : 20
 
       let latestTimestamp: number | undefined = undefined
       if (cachedNotes.length > 0) {
-        const timestamp = await feedDB.getLatestTimestamp()
+        const timestamp = await feedDB.getLatestTimestamp(userPubkey)
         if (timestamp !== null) {
           latestTimestamp = timestamp
         }
@@ -136,7 +149,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )
 
       if (freshNotes.length > 0) {
-        await feedDB.addNotes(freshNotes)
+        await feedDB.addNotes(userPubkey, freshNotes)
         
         setNotes(prev => {
           const seenIds = new Set(prev.map(note => note.id))
@@ -161,13 +174,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   const refreshFeed = async () => {
-    if (refreshing) return
+    if (refreshing || !profile?.pubkey) return
     
     setRefreshing(true)
     try {
       const { feedDB } = await import('@/lib/feedDB')
       
-      const timestamp = await feedDB.getLatestTimestamp()
+      const timestamp = await feedDB.getLatestTimestamp(profile.pubkey)
       
       const freshNotes = await apna.nostr.fetchFeed(
         'FOLLOWING_FEED',
@@ -177,7 +190,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       )
 
       if (freshNotes.length > 0) {
-        await feedDB.addNotes(freshNotes)
+        await feedDB.addNotes(profile.pubkey, freshNotes)
         
         setNotes(prev => {
           const seenIds = new Set(prev.map(note => note.id))
@@ -194,7 +207,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   const loadMore = async () => {
-    if (loadingMore || !lastTimestamp) return
+    if (loadingMore || !lastTimestamp || !profile?.pubkey) return
     
     setLoadingMore(true)
     try {
@@ -204,7 +217,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       
       const { LOAD_MORE_SIZE } = await import('@/lib/feedDB')
       
-      const cachedOlderNotes = await feedDB.getNotes(LOAD_MORE_SIZE, lastTimestamp)
+      const cachedOlderNotes = await feedDB.getNotes(profile.pubkey, LOAD_MORE_SIZE, lastTimestamp)
       const uniqueCachedNotes = cachedOlderNotes.filter(note => !seenNoteIds.has(note.id))
       
       if (uniqueCachedNotes.length > 0) {
@@ -227,7 +240,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const uniqueNetworkNotes = olderNotes.filter(note => !seenNoteIds.has(note.id))
         
         if (uniqueNetworkNotes.length > 0) {
-          await feedDB.addNotes(uniqueNetworkNotes)
+          await feedDB.addNotes(profile.pubkey, uniqueNetworkNotes)
           
           setNotes(prevNotes => {
             const newNotes = [...prevNotes, ...uniqueNetworkNotes].sort((a, b) => b.created_at - a.created_at)
@@ -259,12 +272,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   const likeNote = async (id: string) => {
+    if (!profile?.pubkey) {
+      throw new Error('No active user profile')
+    }
+    
     try {
       await ensureApnaInitialized()
       const result = await apna.nostr.likeNote(id)
       if (result) {
         const { feedDB } = await import('@/lib/feedDB')
-        await feedDB.addNotes([result])
+        await feedDB.addNotes(profile.pubkey, [result])
         setNotes(prev =>
           prev.map(note => note.id === id ? result : note)
         )
@@ -276,12 +293,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   const repostNote = async (id: string) => {
+    if (!profile?.pubkey) {
+      throw new Error('No active user profile')
+    }
+    
     try {
       await ensureApnaInitialized()
       const result = await apna.nostr.repostNote(id, '')
       if (result) {
         const { feedDB } = await import('@/lib/feedDB')
-        await feedDB.addNotes([result])
+        await feedDB.addNotes(profile.pubkey, [result])
         setNotes(prev => [result, ...prev].sort((a, b) => b.created_at - a.created_at))
       }
     } catch (error) {
@@ -291,12 +312,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   const replyToNote = async (id: string, content: string) => {
+    if (!profile?.pubkey) {
+      throw new Error('No active user profile')
+    }
+    
     try {
       await ensureApnaInitialized()
       const result = await apna.nostr.replyToNote(id, content)
       if (result) {
         const { feedDB } = await import('@/lib/feedDB')
-        await feedDB.addNotes([result])
+        await feedDB.addNotes(profile.pubkey, [result])
         setNotes(prev => [result, ...prev].sort((a, b) => b.created_at - a.created_at))
       }
     } catch (error) {
