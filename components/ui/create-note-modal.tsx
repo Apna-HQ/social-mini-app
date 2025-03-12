@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "./button"
 import { Textarea } from "./textarea"
 
@@ -11,6 +12,7 @@ interface CreateNoteModalProps {
 }
 
 export function CreateNoteModal({ isOpen, onClose, onPublish }: CreateNoteModalProps) {
+  const router = useRouter()
   const [content, setContent] = useState("")
   const [isPublishing, setIsPublishing] = useState(false)
 
@@ -23,6 +25,7 @@ export function CreateNoteModal({ isOpen, onClose, onPublish }: CreateNoteModalP
       setIsPublishing(true)
       await onPublish(content)
       setContent("")
+      router.refresh() // Refresh the current page to show the new note
       onClose()
     } catch (error) {
       console.error("Failed to publish note:", error)
