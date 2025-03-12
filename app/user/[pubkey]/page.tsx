@@ -4,7 +4,7 @@ import { useApp } from "../../providers"
 import { useApna } from "@/components/providers/ApnaProvider"
 import { Post } from "@/components/ui/post"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft } from "lucide-react"
@@ -12,6 +12,7 @@ import { UserProfileCard } from "@/components/ui/user-profile-card"
 import { noteToPostProps } from "@/lib/utils/post"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { userProfileDB } from "@/lib/userProfileDB"
+import { userNotesFeedDB, INITIAL_FETCH_SIZE, LOAD_MORE_SIZE } from "@/lib/userNotesFeedDB"
 import type { INote } from "@apna/sdk"
 
 export const dynamic = 'force-dynamic'
@@ -26,15 +27,103 @@ interface UserProfile {
   following: string[]
   pubkey: string
 }
-
 export default function UserProfilePage({ params }: { params: { pubkey: string } }) {
   const router = useRouter()
   const { likeNote, profile } = useApp()
   const { nostr } = useApna()
   const [userNotes, setUserNotes] = useState<INote[]>([])
   const [loadingNotes, setLoadingNotes] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isStale, setIsStale] = useState(false)
+
+  // Function to fetch notes from cache or API
+  const fetchNotes = useCallback(async (pubkey: string, before?: number, currentLength: number = 0) => {
+    try {
+      // First try to get notes from cache
+      const cachedNotes = await userNotesFeedDB.getNotes(
+        pubkey,
+        before ? LOAD_MORE_SIZE : INITIAL_FETCH_SIZE,
+        before
+      )
+      
+      // Convert StoredNotes to INote format
+      const convertToINote = (note: any): INote => ({
+        ...note,
+        kind: 1, // Notes are kind 1
+        sig: note.sig || '',
+        tags: note.tags || [],
+      });
+      
+      // If we have cached notes, use them immediately
+      if (cachedNotes.length > 0) {
+        const convertedNotes = cachedNotes.map(convertToINote);
+        
+        if (before) {
+          // Append to existing notes if loading more
+          setUserNotes(prev => [...prev, ...convertedNotes])
+        } else {
+          // Replace notes if initial load
+          setUserNotes(convertedNotes)
+        }
+        
+        // Check if we might have more notes to load
+        setHasMore(cachedNotes.length >= (before ? LOAD_MORE_SIZE : INITIAL_FETCH_SIZE))
+      }
+      
+      // Get the latest timestamp we have in cache (only used for initial load)
+      const latestTimestamp = before ? undefined : await userNotesFeedDB.getLatestTimestamp(pubkey)
+      
+      // Fetch fresh notes from API
+      // When loading more (before is defined), we don't need since parameter
+      const since = before ? undefined : (latestTimestamp ? latestTimestamp + 1 : undefined)
+      const until = before || undefined
+      const limit = before ? LOAD_MORE_SIZE : INITIAL_FETCH_SIZE
+      
+      const freshEvents = await nostr.fetchUserFeed(pubkey, 'NOTES_FEED', since, until, limit)
+      const freshNotes = freshEvents.filter((event): event is INote => event.kind === 1)
+      
+      // If we got fresh notes, add them to cache and update state
+      if (freshNotes.length > 0) {
+        // Add to cache
+        await userNotesFeedDB.addNotes(pubkey, freshNotes)
+        
+        // Get updated notes from cache to ensure correct order
+        const updatedNotes = await userNotesFeedDB.getNotes(
+          pubkey,
+          before ? currentLength + LOAD_MORE_SIZE : INITIAL_FETCH_SIZE
+        )
+        
+        setUserNotes(updatedNotes.map(convertToINote))
+        setHasMore(freshNotes.length >= limit)
+      } else if (cachedNotes.length === 0) {
+        // If no cached notes and no fresh notes, we have no notes
+        setUserNotes([])
+        setHasMore(false)
+      }
+    } catch (error) {
+      console.error("Failed to fetch user notes:", error)
+    }
+  }, [nostr])
+  
+  // Load more notes
+  const loadMoreNotes = async () => {
+    if (!params.pubkey || loadingMore || !hasMore) return
+    
+    setLoadingMore(true)
+    try {
+      // Get the oldest note timestamp to use as 'before' parameter
+      const oldestNote = userNotes[userNotes.length - 1]
+      if (oldestNote) {
+        await fetchNotes(params.pubkey, oldestNote.created_at, userNotes.length)
+      }
+    } catch (error) {
+      console.error("Failed to load more notes:", error)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -57,10 +146,8 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
           await fetchFreshProfile()
         }
 
-        // Fetch user's notes and filter for kind 1 (text notes)
-        const events = await nostr.fetchUserFeed(params.pubkey, 'NOTES_FEED', undefined, undefined, 20)
-        const notes = events.filter((event): event is INote => event.kind === 1)
-        setUserNotes(notes)
+        // Fetch user's notes using our caching function
+        await fetchNotes(params.pubkey)
       } catch (error) {
         console.error("Failed to fetch user data:", error)
       } finally {
@@ -86,7 +173,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
     }
 
     fetchData()
-  }, [params.pubkey, nostr])
+  }, [params.pubkey, nostr, fetchNotes])
 
   if (!userProfile) {
     return (
@@ -190,16 +277,32 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
                 Loading notes...
               </div>
             ) : userNotes.length > 0 ? (
-              userNotes.map((note) => (
-                <Post
-                  key={note.id}
-                  {...noteToPostProps(note, {
-                    onLike: () => likeNote(note.id),
-                    onRepost: () => nostr.repostNote(note.id, ''),
-                    onReply: () => router.push(`/note/${note.id}`)
-                  })}
-                />
-              ))
+              <>
+                <div className="space-y-4">
+                  {userNotes.map((note) => (
+                    <Post
+                      key={note.id}
+                      {...noteToPostProps(note, {
+                        onLike: () => likeNote(note.id),
+                        onRepost: () => nostr.repostNote(note.id, ''),
+                        onReply: () => router.push(`/note/${note.id}`)
+                      })}
+                    />
+                  ))}
+                </div>
+                
+                {hasMore && (
+                  <div className="flex justify-center mt-6">
+                    <Button 
+                      variant="outline" 
+                      onClick={loadMoreNotes}
+                      disabled={loadingMore}
+                    >
+                      {loadingMore ? 'Loading...' : 'Load More'}
+                    </Button>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 No notes yet
