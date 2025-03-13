@@ -12,6 +12,7 @@ import { useEffect, useState, useCallback } from "react"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { userNotesFeedDB, INITIAL_FETCH_SIZE, LOAD_MORE_SIZE } from "@/lib/userNotesFeedDB"
 import { Button } from "@/components/ui/button"
+import { NpubDisplay } from "@/components/atoms/NpubDisplay"
 import type { INote } from "@apna/sdk"
 
 export default function ProfilePage() {
@@ -185,7 +186,7 @@ export default function ProfilePage() {
                     placeholder="Your name"
                     className="w-full px-3 py-2 border rounded-md bg-background"
                   />
-                  <p className="text-sm text-muted-foreground break-all mt-1">{profile.pubkey}</p>
+                  <NpubDisplay pubkey={profile.pubkey} className="text-sm text-muted-foreground mt-1" />
                 </div>
               </div>
               
@@ -240,7 +241,7 @@ export default function ProfilePage() {
                 </Avatar>
                 <div className="flex-1">
                   <h1 className="text-2xl font-bold">{profile.metadata.name || "Unknown"}</h1>
-                  <p className="text-sm text-muted-foreground break-all">{profile.pubkey}</p>
+                  <NpubDisplay pubkey={profile.pubkey} className="text-sm text-muted-foreground" />
                 </div>
               </div>
               <DynamicEditProfile
@@ -336,7 +337,11 @@ export default function ProfilePage() {
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{userMetadata[pubkey]?.name || pubkey.slice(0, 8)}</p>
-                    <p className="text-sm text-muted-foreground truncate">{userMetadata[pubkey]?.about || pubkey}</p>
+                    {userMetadata[pubkey]?.about ? (
+                      <p className="text-sm text-muted-foreground truncate">{userMetadata[pubkey]?.about}</p>
+                    ) : (
+                      <NpubDisplay pubkey={pubkey} className="text-sm text-muted-foreground" />
+                    )}
                   </div>
                 </div>
               ))
@@ -359,7 +364,11 @@ export default function ProfilePage() {
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{userMetadata[pubkey]?.name || pubkey.slice(0, 8)}</p>
-                    <p className="text-sm text-muted-foreground truncate">{userMetadata[pubkey]?.about || pubkey}</p>
+                    {userMetadata[pubkey]?.about ? (
+                      <p className="text-sm text-muted-foreground truncate">{userMetadata[pubkey]?.about}</p>
+                    ) : (
+                      <NpubDisplay pubkey={pubkey} className="text-sm text-muted-foreground" />
+                    )}
                   </div>
                 </div>
               ))

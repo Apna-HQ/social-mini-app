@@ -13,6 +13,7 @@ import { noteToPostProps } from "@/lib/utils/post"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { userProfileDB } from "@/lib/userProfileDB"
 import { userNotesFeedDB, INITIAL_FETCH_SIZE, LOAD_MORE_SIZE } from "@/lib/userNotesFeedDB"
+import { NpubDisplay } from "@/components/atoms/NpubDisplay"
 import type { INote } from "@apna/sdk"
 
 export const dynamic = 'force-dynamic'
@@ -218,7 +219,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
                   </div>
                 )}
               </div>
-              <p className="text-sm text-muted-foreground break-all">{params.pubkey}</p>
+              <NpubDisplay pubkey={params.pubkey} className="text-sm text-muted-foreground" />
               {profile && profile.pubkey !== params.pubkey && (
                 <Button
                   className="mt-4"

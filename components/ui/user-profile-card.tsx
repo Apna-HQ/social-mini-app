@@ -7,6 +7,8 @@ import { useEffect, useState, useRef } from "react"
 import { useApp } from "@/app/providers"
 import { useApna } from "@/components/providers/ApnaProvider"
 import { userProfileDB } from "@/lib/userProfileDB"
+import { NpubDisplay } from "@/components/atoms/NpubDisplay"
+import { hexToNpub, trimNpub } from "@/lib/utils/nostr"
 
 interface UserProfileCardProps {
   pubkey: string
@@ -117,8 +119,8 @@ export function UserProfileCard({
     }
   }
 
-  const displayName = userProfile?.metadata.name || pubkey.slice(0, 8)
-  const displayAbout = userProfile?.metadata.about || pubkey
+  const displayName = userProfile?.metadata.name || trimNpub(hexToNpub(pubkey), 4, 4)
+  const displayAbout = userProfile?.metadata.about
 
   return (
     <div
@@ -144,7 +146,11 @@ export function UserProfileCard({
             </div>
           )}
         </div>
-        <p className="text-sm text-muted-foreground truncate">{displayAbout}</p>
+        {displayAbout ? (
+          <p className="text-sm text-muted-foreground truncate">{displayAbout}</p>
+        ) : (
+          <NpubDisplay pubkey={pubkey} className="text-sm text-muted-foreground" />
+        )}
       </div>
       {profile && profile.pubkey !== pubkey && (
         <Button

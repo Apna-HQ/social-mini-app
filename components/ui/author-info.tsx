@@ -1,6 +1,8 @@
 "use client"
 import { useUserProfile } from '@/lib/hooks/useUserProfile'
 import { Avatar, AvatarFallback, AvatarImage } from './avatar'
+import { NpubDisplay } from '@/components/atoms/NpubDisplay'
+import { hexToNpub, trimNpub } from '@/lib/utils/nostr'
 
 interface AuthorInfoProps {
   pubkey: string
@@ -30,7 +32,7 @@ export function AuthorInfo({ pubkey, onClick, showTimestamp = true, timestamp }:
             onClick={onClick}
             className="font-semibold truncate cursor-pointer hover:underline"
           >
-            {profile.name || pubkey.slice(0, 8)}
+            {profile.name || trimNpub(hexToNpub(pubkey), 4, 4)}
           </span>
           {showTimestamp && timestamp && (
             <>
@@ -41,9 +43,11 @@ export function AuthorInfo({ pubkey, onClick, showTimestamp = true, timestamp }:
             </>
           )}
         </div>
-        <span className="text-xs text-muted-foreground truncate block">
-          {pubkey}
-        </span>
+        <NpubDisplay
+          pubkey={pubkey}
+          className="text-xs text-muted-foreground"
+          copyButtonClassName="h-3 w-3 ml-1"
+        />
       </div>
     </div>
   )
