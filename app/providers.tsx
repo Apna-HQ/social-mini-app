@@ -279,13 +279,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     try {
       await ensureApnaInitialized()
       const result = await apna.nostr.likeNote(id)
-      if (result) {
-        const { feedDB } = await import('@/lib/feedDB')
-        await feedDB.addNotes(profile.pubkey, [result])
-        setNotes(prev =>
-          prev.map(note => note.id === id ? result : note)
-        )
-      }
+      // Don't add reactions to feedDB or update notes state
+      // as reactions are not notes themselves but reaction events
     } catch (error) {
       console.error("Failed to like note:", error)
       throw error
