@@ -67,6 +67,38 @@ const mockNostr: INostr = {
     sig: "test-sig",
     tags: []
   }),
+  // Add the new reaction fetching methods
+  fetchNoteLikes: async () => [
+    {
+      content: "Like content",
+      created_at: Date.now() / 1000,
+      id: "test-like-id-1",
+      kind: 7,
+      pubkey: "test-pubkey-1",
+      sig: "test-sig",
+      tags: []
+    },
+    {
+      content: "Like content",
+      created_at: Date.now() / 1000,
+      id: "test-like-id-2",
+      kind: 7,
+      pubkey: "test-pubkey-2",
+      sig: "test-sig",
+      tags: []
+    }
+  ],
+  fetchNoteReposts: async () => [
+    {
+      content: "Repost content",
+      created_at: Date.now() / 1000,
+      id: "test-repost-id-1",
+      kind: 6,
+      pubkey: "test-pubkey-1",
+      sig: "test-sig",
+      tags: []
+    }
+  ],
   replyToNote: async (noteId, content) => ({
     ...mockNote,
     content,
