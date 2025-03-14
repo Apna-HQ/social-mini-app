@@ -6,6 +6,7 @@ import { Heart, MessageCircle, Repeat2, ChevronDown, ChevronUp } from "lucide-re
 import { Card, CardContent, CardFooter, CardHeader } from "./card"
 import { AuthorInfo } from "./author-info"
 import { ContentRenderer } from "./content-renderer"
+import { useReactionCounts } from "../../lib/hooks/useReactionCounts"
 
 export interface PostProps {
   id: string
@@ -35,6 +36,7 @@ export function Post({
   isReply,
 }: PostProps) {
   const router = useRouter()
+  const { likes, reposts, isLoading } = useReactionCounts(id)
   
   const handleClick = () => {
     router.push(`/note/${id}`)
@@ -115,14 +117,18 @@ export function Post({
             className="flex items-center gap-1 hover:text-green-500 transition-colors"
           >
             <Repeat2 className="w-4 h-4" />
-            <span className="text-sm">Repost</span>
+            <span className="text-sm">
+              Repost{reposts > 0 && <span className="ml-1">({reposts})</span>}
+            </span>
           </button>
           <button
             onClick={(e) => handleAction(e, onLike)}
             className="flex items-center gap-1 hover:text-red-500 transition-colors"
           >
             <Heart className="w-4 h-4" />
-            <span className="text-sm">Like</span>
+            <span className="text-sm">
+              Like{likes > 0 && <span className="ml-1">({likes})</span>}
+            </span>
           </button>
         </div>
       </CardFooter>
