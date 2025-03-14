@@ -280,6 +280,40 @@ class FeedReactionsDB {
   }
 
   /**
+   * Gets the timestamp of the most recent reaction for a note
+   * @param noteId The ID of the note
+   * @returns The timestamp of the most recent reaction, or undefined if no reactions
+   */
+  async getMostRecentReactionTimestamp(noteId: string): Promise<number | undefined> {
+    if (!noteId) {
+      throw new Error('Note ID is required');
+    }
+    
+    const db = await this.init()
+    const tx = db.transaction(asStoreNames<ReactionDBSchema>('reactions'), 'readonly')
+    const store = tx.objectStore(asStoreNames<ReactionDBSchema>('reactions'))
+    const noteIdIndex = store.index('by-note-id')
+    const timestampIndex = store.index('by-timestamp')
+    
+    // Get all reactions for this note
+    const reactions = await this.getReactionsForNote(noteId)
+    
+    if (reactions.length === 0) {
+      return undefined
+    }
+    
+    // Find the most recent reaction by created_at timestamp
+    let mostRecent = reactions[0].created_at
+    for (const reaction of reactions) {
+      if (reaction.created_at > mostRecent) {
+        mostRecent = reaction.created_at
+      }
+    }
+    
+    return mostRecent
+  }
+
+  /**
    * Checks if a user has reacted to a note
    * @param noteId The ID of the note
    * @param pubkey The public key of the user

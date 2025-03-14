@@ -40,10 +40,14 @@ export function useReactionCounts(noteId: string, refreshKey?: number): Reaction
           })
         }
 
-        // Then fetch fresh counts from the network
+        // Get the timestamp of the most recent reaction we have
+        const mostRecentTimestamp = await feedReactionsDB.getMostRecentReactionTimestamp(noteId)
+        const since = mostRecentTimestamp ? mostRecentTimestamp : undefined
+
+        // Then fetch fresh counts from the network, using since parameter to only get newer reactions
         const [likes, reposts] = await Promise.all([
-          apna.nostr.fetchNoteLikes(noteId),
-          apna.nostr.fetchNoteReposts(noteId)
+          apna.nostr.fetchNoteLikes(noteId, since),
+          apna.nostr.fetchNoteReposts(noteId, since)
         ])
 
         // Store the fresh reactions in the database
