@@ -53,11 +53,15 @@ export function useReactionCounts(noteId: string, refreshKey?: number): Reaction
         // Store the fresh reactions in the database
         await storeReactions(likes, reposts, noteId)
 
-        // Update the UI with fresh counts
+        // Get the total counts by combining cached and fresh reactions
+        // Since we're using the 'since' parameter, we need to add the new reactions to our cached counts
+        const totalCounts = await feedReactionsDB.getReactionCountsForNote(noteId)
+        
+        // Update the UI with combined counts
         if (isMounted) {
           setCounts({
-            likes: likes.length,
-            reposts: reposts.length,
+            likes: totalCounts[ReactionType.LIKE],
+            reposts: totalCounts[ReactionType.REPOST],
             isLoading: false
           })
         }
