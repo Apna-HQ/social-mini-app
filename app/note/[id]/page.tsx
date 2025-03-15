@@ -135,6 +135,7 @@ export default function ThreadPage() {
               setReplyingTo(note.id);
             }
           })}
+          hideParentNote={true}
         />
         {replyingTo === note.id && (
           <ReplyForm 

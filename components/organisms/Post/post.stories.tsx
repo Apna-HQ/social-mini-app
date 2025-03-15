@@ -99,9 +99,10 @@ export const WithInteractions: Story = {
 
 export const AsReply: Story = {
   render: () => (
-    <Post 
+    <Post
       {...baseProps}
       isReply={true}
+      parentNoteId="parent-note-123"
       content="This is a reply to another post!"
     />
   ),

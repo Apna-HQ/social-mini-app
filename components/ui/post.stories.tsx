@@ -194,5 +194,6 @@ export const AsReply: Story = {
     },
     timestamp: Date.now(),
     isReply: true,
+    parentNoteId: 'parent-note-123',
   },
 }

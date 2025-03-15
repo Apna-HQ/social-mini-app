@@ -13,6 +13,20 @@ export function noteToPostProps(
     onReply?: () => void
   } = {}
 ): PostProps {
+  // Find parent note ID from tags
+  // In Nostr, reply relationships are stored in tags with format ["e", noteId, ...]
+  // Filter for all "e" tags and take the last one as the parent
+  const eTags = note.tags?.filter(
+    (tag) => Array.isArray(tag) && tag[0] === "e"
+  ) || [];
+  
+  // Get the last e tag as the parent
+  const parentTag = eTags.length > 0 ? eTags[eTags.length - 1] : undefined;
+  
+  const parentNoteId = parentTag ? parentTag[1] : undefined;
+  
+  const isReply = !!parentNoteId;
+
   return {
     id: note.id,
     content: note.content,
@@ -25,11 +39,7 @@ export function noteToPostProps(
     onLike,
     onRepost,
     onReply,
-    isReply: note.tags?.some(
-      (tag) =>
-        Array.isArray(tag) &&
-        tag[0] === "e" &&
-        (tag[3] === "reply" || tag[3] === "root")
-    ),
+    isReply,
+    parentNoteId,
   }
 }

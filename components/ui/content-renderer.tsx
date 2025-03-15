@@ -15,6 +15,8 @@ interface ContentSegment {
 interface ContentRendererProps {
   content: string
   onHashtagClick?: (hashtag: string) => void
+  parentNoteId?: string
+  hideParentNote?: boolean
 }
 
 interface ReferencedNote {
@@ -181,11 +183,64 @@ function parseContent(content: string): ContentSegment[] {
   return segments
 }
 
-export function ContentRenderer({ content, onHashtagClick }: ContentRendererProps) {
+// Parent Note component to display the parent note
+const ParentNote = ({ note }: { note: ReferencedNote }) => {
+  const router = useRouter()
+  
+  return (
+    <Card className="border-muted mb-4 hover:bg-accent/5 transition-colors cursor-pointer"
+      onClick={() => router.push(`/note/${note.id}`)}>
+      <CardHeader className="pb-2">
+        <AuthorInfo
+          pubkey={note.author.pubkey}
+          onClick={(e) => {
+            e.stopPropagation()
+            router.push(`/user/${note.author.pubkey}`)
+          }}
+          timestamp={note.created_at}
+        />
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm whitespace-pre-wrap break-words">
+          {note.content}
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+export function ContentRenderer({ content, onHashtagClick, parentNoteId, hideParentNote }: ContentRendererProps) {
   const router = useRouter()
   const apna = useApna()
   const [referencedNotes, setReferencedNotes] = useState<{ [key: string]: ReferencedNote }>({})
+  const [parentNote, setParentNote] = useState<ReferencedNote | null>(null)
   const segments = parseContent(content)
+
+  // Fetch parent note if parentNoteId is provided
+  useEffect(() => {
+    const fetchParentNote = async () => {
+      if (!parentNoteId) return
+      
+      try {
+        const note = await apna.nostr.fetchNote(parentNoteId)
+        if (note) {
+          setParentNote({
+            id: note.id,
+            content: note.content,
+            author: {
+              pubkey: note.pubkey,
+              // Additional metadata could be fetched here if needed
+            },
+            created_at: note.created_at
+          })
+        }
+      } catch (error) {
+        console.error(`Failed to fetch parent note ${parentNoteId}:`, error)
+      }
+    }
+
+    fetchParentNote()
+  }, [parentNoteId, apna])
 
   useEffect(() => {
     const fetchReferencedNotes = async () => {
@@ -220,10 +275,17 @@ export function ContentRenderer({ content, onHashtagClick }: ContentRendererProp
     if (segments.some(segment => segment.type === "nostr")) {
       fetchReferencedNotes()
     }
-  }, [content, apna])
+  }, [content, apna, segments])
 
   return (
     <div className="space-y-2">
+      {/* Render parent note if it exists and is not hidden */}
+      {parentNote && !hideParentNote && (
+        <div className="mb-4 border-b pb-4">
+          <div className="text-sm text-muted-foreground mb-2">Replying to:</div>
+          <ParentNote note={parentNote} />
+        </div>
+      )}
       {segments.map((segment, index) => {
         switch (segment.type) {
           case "text":

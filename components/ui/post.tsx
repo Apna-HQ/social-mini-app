@@ -22,6 +22,8 @@ export interface PostProps {
   onReply?: () => void
   onHashtagClick?: (hashtag: string) => void
   isReply?: boolean
+  parentNoteId?: string
+  hideParentNote?: boolean
 }
 
 export function Post({
@@ -34,6 +36,8 @@ export function Post({
   onReply,
   onHashtagClick,
   isReply,
+  parentNoteId,
+  hideParentNote,
 }: PostProps) {
   const router = useRouter()
   const { likes, reposts, isLoading } = useReactionCounts(id)
@@ -69,15 +73,12 @@ export function Post({
       </CardHeader>
       <CardContent className="pb-3">
         <div className="relative">
-          {isReply && (
-            <span className="text-xs text-muted-foreground/50 mb-1 block">
-              reply
-            </span>
-          )}
           <div className={!isExpanded && shouldTruncate ? "max-h-[120px] overflow-hidden" : ""}>
             <ContentRenderer
               content={content}
               onHashtagClick={onHashtagClick}
+              parentNoteId={parentNoteId}
+              hideParentNote={hideParentNote}
             />
           </div>
           {shouldTruncate && (
