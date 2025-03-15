@@ -94,9 +94,6 @@ const meta: Meta<typeof Post> = {
   },
   tags: ['autodocs'],
   argTypes: {
-    onLike: { action: 'liked' },
-    onRepost: { action: 'reposted' },
-    onReply: { action: 'replied' },
     onHashtagClick: { action: 'hashtag clicked' },
   },
   // Wrap all stories with the MockApnaProvider
