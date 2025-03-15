@@ -183,6 +183,9 @@ function parseContent(content: string): ContentSegment[] {
   return segments
 }
 
+// Import the ExpandableContent component
+import { ExpandableContent } from "./expandable-content"
+
 // Parent Note component to display the parent note
 const ParentNote = ({ note }: { note: ReferencedNote }) => {
   const router = useRouter()
@@ -201,9 +204,15 @@ const ParentNote = ({ note }: { note: ReferencedNote }) => {
         />
       </CardHeader>
       <CardContent>
-        <p className="text-sm whitespace-pre-wrap break-words">
-          {note.content}
-        </p>
+        <ExpandableContent
+          content={
+            <ContentRenderer
+              content={note.content}
+              // No parentNoteId or hideParentNote props as per requirements
+            />
+          }
+          contentLength={note.content.length}
+        />
       </CardContent>
     </Card>
   )

@@ -1,11 +1,11 @@
 "use client"
-import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Heart, MessageCircle, Repeat2, ChevronDown, ChevronUp } from "lucide-react"
+import { Heart, MessageCircle, Repeat2 } from "lucide-react"
 
 import { Card, CardContent, CardFooter, CardHeader } from "./card"
 import { AuthorInfo } from "./author-info"
 import { ContentRenderer } from "./content-renderer"
+import { ExpandableContent } from "./expandable-content"
 import { useReactionCounts } from "../../lib/hooks/useReactionCounts"
 
 export interface PostProps {
@@ -56,9 +56,6 @@ export function Post({
     router.push(`/user/${author.pubkey}`)
   }
 
-  const [isExpanded, setIsExpanded] = useState(false)
-  const shouldTruncate = content.length > 280
-
   return (
     <Card
       className="mb-4 hover:bg-accent/5 transition-colors cursor-pointer"
@@ -72,37 +69,17 @@ export function Post({
         />
       </CardHeader>
       <CardContent className="pb-3">
-        <div className="relative">
-          <div className={!isExpanded && shouldTruncate ? "max-h-[120px] overflow-hidden" : ""}>
+        <ExpandableContent
+          content={
             <ContentRenderer
               content={content}
               onHashtagClick={onHashtagClick}
               parentNoteId={parentNoteId}
               hideParentNote={hideParentNote}
             />
-          </div>
-          {shouldTruncate && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setIsExpanded(!isExpanded)
-              }}
-              className="text-primary hover:text-primary/90 text-sm font-medium flex items-center gap-1 mt-2"
-            >
-              {isExpanded ? (
-                <>
-                  Show less
-                  <ChevronUp className="w-4 h-4" />
-                </>
-              ) : (
-                <>
-                  Show more
-                  <ChevronDown className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          )}
-        </div>
+          }
+          contentLength={content.length}
+        />
       </CardContent>
       <CardFooter className="border-t pt-3">
         <div className="flex gap-6 text-muted-foreground">
