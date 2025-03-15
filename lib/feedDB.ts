@@ -35,8 +35,8 @@ function asStoreNames<T>(name: string): StoreNames<T> {
 
 export const MAX_CACHE_AGE_DAYS = 14 // Cache items for 14 days
 export const MAX_CACHE_ITEMS = 5000 // Maximum number of items to keep in cache
-export const INITIAL_FETCH_SIZE = 100 // Number of items to fetch on first load
-export const LOAD_MORE_SIZE = 50 // Number of items to fetch when loading more
+export const INITIAL_FETCH_SIZE = 20 // Number of items to fetch on first load
+export const LOAD_MORE_SIZE = 20 // Number of items to fetch when loading more
 
 class FeedDB {
   private dbName = 'social-mini-app-feed'
