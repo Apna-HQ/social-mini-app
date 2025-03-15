@@ -90,9 +90,6 @@ export const WithInteractions: Story = {
   render: () => (
     <Post 
       {...baseProps}
-      onReply={() => console.log('Reply clicked')}
-      onRepost={() => console.log('Repost clicked')}
-      onLike={() => console.log('Like clicked')}
     />
   ),
 };
