@@ -2,14 +2,12 @@
 
 import { useApp } from "../providers"
 import { useApna } from "@/components/providers/ApnaProvider"
-import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import { ProfileTemplate, UserProfile } from "@/components/templates/ProfileTemplate"
 import { userProfileDB } from "@/lib/userProfileDB"
 
 export default function ProfilePage() {
-  const router = useRouter()
-  const { profile: appProfile, updateProfileMetadata, publishNote, likeNote } = useApp()
+  const { profile: appProfile, updateProfileMetadata, publishNote } = useApp()
   const { nostr } = useApna()
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [userMetadata, setUserMetadata] = useState<Record<string, any>>({})
@@ -109,18 +107,6 @@ export default function ProfilePage() {
     })
   }
 
-  const handleLikeNote = (noteId: string) => {
-    likeNote(noteId)
-  }
-
-  const handleRepostNote = (noteId: string) => {
-    nostr.repostNote(noteId, '')
-  }
-
-  const handleReplyToNote = (noteId: string) => {
-    router.push(`/note/${noteId}`)
-  }
-
   if (!userProfile) {
     return (
       <div className="min-h-screen bg-background">
@@ -146,9 +132,6 @@ export default function ProfilePage() {
       onEditSave={handleEditSave}
       onEditCancel={handleEditCancel}
       onPublishNote={publishNote}
-      onLikeNote={handleLikeNote}
-      onRepostNote={handleRepostNote}
-      onReplyToNote={handleReplyToNote}
       nostr={nostr}
       userMetadata={userMetadata}
     />

@@ -5,13 +5,11 @@ import { useApna } from "@/components/providers/ApnaProvider"
 import { useEffect, useState } from "react"
 import { userProfileDB } from "@/lib/userProfileDB"
 import { ProfileTemplate, UserProfile } from "@/components/templates/ProfileTemplate"
-import { useRouter } from "next/navigation"
 
 export const dynamic = 'force-dynamic'
 
 export default function UserProfilePage({ params }: { params: { pubkey: string } }) {
-  const router = useRouter()
-  const { likeNote, profile } = useApp()
+  const { profile } = useApp()
   const { nostr } = useApna()
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isStale, setIsStale] = useState(false)
@@ -69,18 +67,6 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
     }
   }
 
-  const handleLikeNote = (noteId: string) => {
-    likeNote(noteId)
-  }
-
-  const handleRepostNote = (noteId: string) => {
-    nostr.repostNote(noteId, '')
-  }
-
-  const handleReplyToNote = (noteId: string) => {
-    router.push(`/note/${noteId}`)
-  }
-
   if (!userProfile) {
     return (
       <div className="min-h-screen bg-background">
@@ -101,9 +87,6 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
       showFollowButton={true}
       isStale={isStale}
       onFollowToggle={handleFollowToggle}
-      onLikeNote={handleLikeNote}
-      onRepostNote={handleRepostNote}
-      onReplyToNote={handleReplyToNote}
       nostr={nostr}
     />
   )

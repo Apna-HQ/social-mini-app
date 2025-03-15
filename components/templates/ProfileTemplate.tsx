@@ -51,9 +51,6 @@ interface ProfileTemplateProps {
   // Action handlers
   onFollowToggle?: () => Promise<void>
   onPublishNote?: (content: string) => Promise<void>
-  onLikeNote?: (noteId: string) => void
-  onRepostNote?: (noteId: string) => void
-  onReplyToNote?: (noteId: string) => void
   
   // Data fetching
   nostr: any
@@ -75,9 +72,6 @@ export function ProfileTemplate({
   onEditCancel,
   onFollowToggle,
   onPublishNote,
-  onLikeNote,
-  onRepostNote,
-  onReplyToNote,
   nostr,
   userMetadata = {}
 }: ProfileTemplateProps) {
@@ -378,11 +372,7 @@ export function ProfileTemplate({
                     {userNotes.map((note) => (
                       <Post
                         key={note.id}
-                        {...noteToPostProps(note, {
-                          onLike: () => onLikeNote && onLikeNote(note.id),
-                          onRepost: () => onRepostNote && onRepostNote(note.id),
-                          onReply: () => onReplyToNote && onReplyToNote(note.id)
-                        })}
+                        {...noteToPostProps(note)}
                       />
                     ))}
                   </div>
