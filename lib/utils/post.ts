@@ -2,16 +2,7 @@ import type { INote } from "@apna/sdk"
 import type { PostProps } from "@/components/ui/post"
 
 export function noteToPostProps(
-  note: INote,
-  {
-    onLike,
-    onRepost,
-    onReply,
-  }: {
-    onLike?: () => void
-    onRepost?: () => void
-    onReply?: () => void
-  } = {}
+  note: INote
 ): PostProps {
   // Find parent note ID from tags
   // In Nostr, reply relationships are stored in tags with format ["e", noteId, ...]
@@ -36,9 +27,6 @@ export function noteToPostProps(
       pubkey: note.pubkey,
     },
     timestamp: note.created_at,
-    onLike,
-    onRepost,
-    onReply,
     isReply,
     parentNoteId,
   }

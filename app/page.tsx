@@ -120,11 +120,7 @@ export default function Home() {
           {notes.map((note: INote) => (
             <Post
               key={note.id}
-              {...noteToPostProps(note, {
-                onLike: () => likeNote(note.id),
-                onRepost: () => repostNote(note.id),
-                onReply: () => router.push(`/note/${note.id}`)
-              })}
+              {...noteToPostProps(note)}
             />
           ))}
           {notes.length === 0 && (

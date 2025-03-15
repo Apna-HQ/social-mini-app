@@ -127,16 +127,23 @@ export default function ThreadPage() {
     return (
       <div ref={noteRef}>
         <Post
-          {...noteToPostProps(note, {
-            onReply: () => {
-              if (noteRef.current) {
-                noteRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }
-              setReplyingTo(note.id);
-            }
-          })}
+          {...noteToPostProps(note)}
           hideParentNote={true}
+          onHashtagClick={(hashtag) => {
+            // Handle hashtag click if needed
+          }}
         />
+        <button
+          className="mt-2 text-primary hover:text-primary/90 text-sm font-medium"
+          onClick={() => {
+            if (noteRef.current) {
+              noteRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            setReplyingTo(note.id);
+          }}
+        >
+          Reply to this note
+        </button>
         {replyingTo === note.id && (
           <ReplyForm 
             noteId={note.id} 

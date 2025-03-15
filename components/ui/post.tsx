@@ -1,11 +1,11 @@
 "use client"
 import { useRouter } from "next/navigation"
-import { Heart, MessageCircle, Repeat2 } from "lucide-react"
 
-import { Card, CardContent, CardFooter, CardHeader } from "./card"
+import { Card, CardContent, CardHeader } from "./card"
 import { AuthorInfo } from "./author-info"
 import { ContentRenderer } from "./content-renderer"
 import { ExpandableContent } from "./expandable-content"
+import { PostActions } from "./post-actions"
 import { useReactionCounts } from "../../lib/hooks/useReactionCounts"
 
 export interface PostProps {
@@ -17,9 +17,6 @@ export interface PostProps {
     pubkey: string
   }
   timestamp: number
-  onLike?: () => void
-  onRepost?: () => void
-  onReply?: () => void
   onHashtagClick?: (hashtag: string) => void
   isReply?: boolean
   parentNoteId?: string
@@ -31,9 +28,6 @@ export function Post({
   content,
   author,
   timestamp,
-  onLike,
-  onRepost,
-  onReply,
   onHashtagClick,
   isReply,
   parentNoteId,
@@ -44,11 +38,6 @@ export function Post({
   
   const handleClick = () => {
     router.push(`/note/${id}`)
-  }
-
-  const handleAction = (e: React.MouseEvent, action?: () => void) => {
-    e.stopPropagation()
-    action?.()
   }
 
   const handleUserClick = (e: React.MouseEvent) => {
@@ -81,35 +70,11 @@ export function Post({
           contentLength={content.length}
         />
       </CardContent>
-      <CardFooter className="border-t pt-3">
-        <div className="flex gap-6 text-muted-foreground">
-          <button
-            onClick={(e) => handleAction(e, onReply)}
-            className="flex items-center gap-1 hover:text-primary transition-colors"
-          >
-            <MessageCircle className="w-4 h-4" />
-            <span className="text-sm">Reply</span>
-          </button>
-          <button
-            onClick={(e) => handleAction(e, onRepost)}
-            className="flex items-center gap-1 hover:text-green-500 transition-colors"
-          >
-            <Repeat2 className="w-4 h-4" />
-            <span className="text-sm">
-              Repost{reposts > 0 && <span className="ml-1">({reposts})</span>}
-            </span>
-          </button>
-          <button
-            onClick={(e) => handleAction(e, onLike)}
-            className="flex items-center gap-1 hover:text-red-500 transition-colors"
-          >
-            <Heart className="w-4 h-4" />
-            <span className="text-sm">
-              Like{likes > 0 && <span className="ml-1">({likes})</span>}
-            </span>
-          </button>
-        </div>
-      </CardFooter>
+      <PostActions
+        id={id}
+        likes={likes}
+        reposts={reposts}
+      />
     </Card>
   )
 }

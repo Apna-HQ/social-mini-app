@@ -183,12 +183,15 @@ function parseContent(content: string): ContentSegment[] {
   return segments
 }
 
-// Import the ExpandableContent component
+// Import the ExpandableContent component and PostActions
 import { ExpandableContent } from "./expandable-content"
+import { PostActions } from "./post-actions"
+import { useReactionCounts } from "../../lib/hooks/useReactionCounts"
 
 // Parent Note component to display the parent note
 const ParentNote = ({ note }: { note: ReferencedNote }) => {
   const router = useRouter()
+  const { likes, reposts } = useReactionCounts(note.id)
   
   return (
     <Card className="border-muted mb-4 hover:bg-accent/5 transition-colors cursor-pointer"
@@ -203,7 +206,7 @@ const ParentNote = ({ note }: { note: ReferencedNote }) => {
           timestamp={note.created_at}
         />
       </CardHeader>
-      <CardContent>
+      <CardContent className="pb-3">
         <ExpandableContent
           content={
             <ContentRenderer
@@ -214,6 +217,11 @@ const ParentNote = ({ note }: { note: ReferencedNote }) => {
           contentLength={note.content.length}
         />
       </CardContent>
+      <PostActions
+        id={note.id}
+        likes={likes}
+        reposts={reposts}
+      />
     </Card>
   )
 }
