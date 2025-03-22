@@ -91,7 +91,7 @@ export default function Home() {
 
   return (
     <main
-      className="min-h-screen bg-background relative pb-20"
+      className="h-full bg-background relative pb-20"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
