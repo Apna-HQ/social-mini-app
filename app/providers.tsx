@@ -1,7 +1,8 @@
 "use client"
 import { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { nip19 } from "nostr-tools"
-import { useApna } from "@/components/providers/ApnaProvider"
+import { useApna } from "@/components/providers/ApnaProvider";
+import type { BaseNote } from "@/lib/feedDB"; // Import BaseNote
 
 type DecodedNprofile = {
   type: 'nprofile'
@@ -29,236 +30,78 @@ interface Profile {
 }
 
 interface AppContextType {
-  notes: any[]
-  profile: Profile | null
-  loading: boolean
-  loadingMore: boolean
-  refreshing: boolean
-  loadMore: () => Promise<void>
-  refreshFeed: () => Promise<void>
+  profile: Profile | null; // Keep profile and other non-feed related items
   publishNote: (content: string) => Promise<void>
   likeNote: (id: string) => Promise<void>
   repostNote: (id: string) => Promise<void>
   replyToNote: (id: string, content: string) => Promise<void>
   fetchNoteAndReplies: (id: string) => Promise<any>
   updateProfileMetadata: (metadata: { name?: string, about?: string }) => Promise<void>
-  saveScrollPosition: (position: number) => void
-  savedScrollPosition: number | null,
+// Removed saveScrollPosition and savedScrollAnchorId
   fetchUserProfile: (pubkey: string) => Promise<Profile | null>
 }
 
 const AppContext = createContext<AppContextType | null>(null)
 
 
-const SCROLL_POSITION_KEY = 'feed-scroll-position'
+// Removed SCROLL_ANCHOR_KEY constant
 
 const ensureApnaInitialized = async () => {
   console.log("ensure")
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [notes, setNotes] = useState<any[]>([])
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true)
-  const apna = useApna()
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const [lastTimestamp, setLastTimestamp] = useState<number | null>(null)
-  const [savedScrollPosition, setSavedScrollPosition] = useState<number | null>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(SCROLL_POSITION_KEY)
-      return saved ? Number(saved) : null
-    }
-    return null
-  })
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const apna = useApna();
+  // Removed notes, loading, loadingMore, refreshing, lastTimestamp state
+ // Removed savedScrollAnchorId state
 
-  const saveScrollPosition = useCallback((position: number) => {
-    setSavedScrollPosition(position)
-    localStorage.setItem(SCROLL_POSITION_KEY, position.toString())
-  }, [])
+ // Removed saveScrollPosition function
 
-  useEffect(() => {
-    return () => {
-      const currentScroll = window.scrollY
-      localStorage.setItem(SCROLL_POSITION_KEY, currentScroll.toString())
-    }
-  }, [])
+  // Removed useEffect that saved window.scrollY on unmount
 
-  const fetchInitialFeed = async () => {
+  // Removed fetchInitialFeed, refreshFeed, loadMore functions
+  // Fetch initial profile info (Keep this part)
+  const fetchInitialProfile = async () => {
     try {
-      const { feedDB, INITIAL_FETCH_SIZE } = await import('@/lib/feedDB')
-      
-      // Get the active user's pubkey
-      const userProfile = await apna.nostr.getActiveUserProfile()
-      let userPubkey: string | null = null
-      
+      const userProfile = await apna.nostr.getActiveUserProfile();
+      let userPubkey: string | null = null;
+
       if (userProfile) {
         userPubkey = (() => {
-          const decoded = nip19.decode(userProfile.nprofile) as DecodedNprofile
-          if (decoded.type === 'nprofile' && decoded.data.pubkey) {
-            // Encode the pubkey as npub and then decode it to get the hex string
-            const npub = nip19.npubEncode(decoded.data.pubkey)
-            return nip19.decode(npub).data as string
+          try {
+            const decoded = nip19.decode(userProfile.nprofile) as DecodedNprofile;
+            if (decoded.type === 'nprofile' && decoded.data.pubkey) {
+              const npub = nip19.npubEncode(decoded.data.pubkey);
+              return nip19.decode(npub).data as string;
+            }
+          } catch (e) {
+            console.error("Failed to decode nprofile for initial profile fetch:", e);
           }
-          return null
-        })()
-      }
-      
-      if (!userPubkey) {
-        console.error("No active user pubkey found")
-        setLoading(false)
-        return
-      }
-      
-      const cachedNotes = await feedDB.getNotes(userPubkey, INITIAL_FETCH_SIZE)
-      
-      if (cachedNotes.length > 0) {
-        setNotes(cachedNotes)
-        setLastTimestamp(cachedNotes[cachedNotes.length - 1].created_at)
-        setLoading(false)
+          return null;
+        })();
       }
 
-      await ensureApnaInitialized()
-      
-      // Set the profile
-      setProfile({
-        metadata: userProfile.metadata,
-        pubkey: userPubkey,
-        stats: {
-          posts: 0
-        },
-        followers: userProfile.followers || [],
-        following: userProfile.following || []
-      })
-
-      const fetchSize = cachedNotes.length === 0 ? INITIAL_FETCH_SIZE : 20
-
-      let latestTimestamp: number | undefined = undefined
-      if (cachedNotes.length > 0) {
-        const timestamp = await feedDB.getLatestTimestamp(userPubkey)
-        if (timestamp !== null) {
-          latestTimestamp = timestamp
-        }
-      }
-
-      const freshNotes = await apna.nostr.fetchFeed(
-        'FOLLOWING_FEED',
-        latestTimestamp,
-        undefined,
-        fetchSize
-      )
-
-      if (freshNotes.length > 0) {
-        await feedDB.addNotes(userPubkey, freshNotes)
-        
-        setNotes(prev => {
-          const seenIds = new Set(prev.map(note => note.id))
-          // @ts-ignore
-          const uniqueNewNotes = freshNotes.filter(note => !seenIds.has(note.id))
-          return [...uniqueNewNotes, ...prev].sort((a, b) => b.created_at - a.created_at)
-        })
-
-        if (freshNotes[freshNotes.length - 1].created_at < (lastTimestamp || Infinity)) {
-          setLastTimestamp(freshNotes[freshNotes.length - 1].created_at)
-        }
-      }
-
-      if (cachedNotes.length === 0) {
-        setLoading(false)
+      if (userPubkey) {
+        setProfile({
+          metadata: userProfile.metadata,
+          pubkey: userPubkey,
+          stats: { posts: 0 }, // Initial stats, might be updated elsewhere
+          followers: userProfile.followers || [],
+          following: userProfile.following || [],
+        });
+      } else {
+        console.error("No active user pubkey found for initial profile fetch");
       }
     } catch (error) {
-      console.error("Failed to initialize:", error)
-    } finally {
-      setLoading(false)
+      console.error("Failed to fetch initial profile:", error);
     }
-  }
+  };
 
-  const refreshFeed = async () => {
-    if (refreshing || !profile?.pubkey) return
-    
-    setRefreshing(true)
-    try {
-      const { feedDB } = await import('@/lib/feedDB')
-      
-      const timestamp = await feedDB.getLatestTimestamp(profile.pubkey)
-      
-      const freshNotes = await apna.nostr.fetchFeed(
-        'FOLLOWING_FEED',
-        timestamp || undefined,
-        undefined,
-        20
-      )
-
-      if (freshNotes.length > 0) {
-        await feedDB.addNotes(profile.pubkey, freshNotes)
-        
-        setNotes(prev => {
-          const seenIds = new Set(prev.map(note => note.id))
-          // @ts-ignore
-          const uniqueNewNotes = freshNotes.filter(note => !seenIds.has(note.id))
-          return [...uniqueNewNotes, ...prev].sort((a, b) => b.created_at - a.created_at)
-        })
-      }
-    } catch (error) {
-      console.error("Failed to refresh feed:", error)
-    } finally {
-      setRefreshing(false)
-    }
-  }
-
-  const loadMore = async () => {
-    if (loadingMore || !lastTimestamp || !profile?.pubkey) return
-    
-    setLoadingMore(true)
-    try {
-      const { feedDB } = await import('@/lib/feedDB')
-      
-      const seenNoteIds = new Set(notes.map(note => note.id))
-      
-      const { LOAD_MORE_SIZE } = await import('@/lib/feedDB')
-      
-      const cachedOlderNotes = await feedDB.getNotes(profile.pubkey, LOAD_MORE_SIZE, lastTimestamp)
-      const uniqueCachedNotes = cachedOlderNotes.filter(note => !seenNoteIds.has(note.id))
-      
-      if (uniqueCachedNotes.length > 0) {
-        uniqueCachedNotes.forEach(note => seenNoteIds.add(note.id))
-        setNotes(prevNotes => {
-          const newNotes = [...prevNotes, ...uniqueCachedNotes].sort((a, b) => b.created_at - a.created_at)
-          return newNotes
-        })
-        setLastTimestamp(uniqueCachedNotes[uniqueCachedNotes.length - 1].created_at)
-      }
-      
-      if (uniqueCachedNotes.length < LOAD_MORE_SIZE) {
-        const olderNotes = await apna.nostr.fetchFeed(
-          'FOLLOWING_FEED',
-          undefined,
-          lastTimestamp,
-          LOAD_MORE_SIZE
-        )
-        // @ts-ignore
-        const uniqueNetworkNotes = olderNotes.filter(note => !seenNoteIds.has(note.id))
-        
-        if (uniqueNetworkNotes.length > 0) {
-          await feedDB.addNotes(profile.pubkey, uniqueNetworkNotes)
-          
-          setNotes(prevNotes => {
-            const newNotes = [...prevNotes, ...uniqueNetworkNotes].sort((a, b) => b.created_at - a.created_at)
-            return newNotes
-          })
-          setLastTimestamp(uniqueNetworkNotes[uniqueNetworkNotes.length - 1].created_at)
-        }
-      }
-    } catch (error) {
-      console.error("Failed to load more notes:", error)
-    } finally {
-      setLoadingMore(false)
-    }
-  }
-
+  // Fetch profile on mount
   useEffect(() => {
-    fetchInitialFeed()
-  }, [])
+    fetchInitialProfile();
+  }, [apna]); // Depend on apna context
 
   const publishNote = async (content: string) => {
     if (!content.trim()) return
@@ -296,9 +139,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await ensureApnaInitialized()
       const result = await apna.nostr.repostNote(id, '')
       if (result) {
-        const { feedDB } = await import('@/lib/feedDB')
-        await feedDB.addNotes(profile.pubkey, [result])
-        setNotes(prev => [result, ...prev].sort((a, b) => b.created_at - a.created_at))
+        // Map INoteRepost to BaseNote before adding to DB
+        const repostForDb: BaseNote = {
+          id: result.id,
+          content: result.content,
+          pubkey: result.pubkey,
+          created_at: result.created_at,
+          tags: result.tags as string[][], // Assert type compatibility
+          sig: result.sig,
+        };
+        // We still need feedDB instance here, ensure it's imported if not already
+        const { feedDB } = await import('@/lib/feedDB');
+        await feedDB.addNotes(profile.pubkey, [repostForDb])
+        // Removed setNotes call - feed state is managed by useFeed hook now
       }
     } catch (error) {
       console.error("Failed to repost note:", error)
@@ -315,9 +168,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await ensureApnaInitialized()
       const result = await apna.nostr.replyToNote(id, content)
       if (result) {
-        const { feedDB } = await import('@/lib/feedDB')
-        await feedDB.addNotes(profile.pubkey, [result])
-        setNotes(prev => [result, ...prev].sort((a, b) => b.created_at - a.created_at))
+        // Map INoteReply to BaseNote before adding to DB
+        const replyForDb: BaseNote = {
+          id: result.id,
+          content: result.content,
+          pubkey: result.pubkey,
+          created_at: result.created_at,
+          tags: result.tags as string[][], // Assert type compatibility
+          sig: result.sig,
+        };
+        // Ensure feedDB instance is imported if not already
+        const { feedDB } = await import('@/lib/feedDB');
+        await feedDB.addNotes(profile.pubkey, [replyForDb])
+        // Removed setNotes call - feed state is managed by useFeed hook now
       }
     } catch (error) {
       console.error("Failed to reply to note:", error)
@@ -393,21 +256,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      notes,
+      // Provide only the remaining context values
       profile,
-      loading,
-      loadingMore,
-      refreshing,
-      loadMore,
-      refreshFeed,
       publishNote,
       likeNote,
       repostNote,
       replyToNote,
       fetchNoteAndReplies,
       updateProfileMetadata,
-      saveScrollPosition,
-      savedScrollPosition,
+      // Removed saveScrollPosition and savedScrollAnchorId from context value
       fetchUserProfile
     }}>
       {children}

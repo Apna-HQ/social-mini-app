@@ -19,8 +19,9 @@ export interface PostProps {
   timestamp: number
   onHashtagClick?: (hashtag: string) => void
   isReply?: boolean
-  parentNoteId?: string
-  hideParentNote?: boolean
+  parentNoteId?: string;
+  hideParentNote?: boolean;
+  // Removed interaction handlers from props
 }
 
 export function Post({
@@ -32,6 +33,7 @@ export function Post({
   isReply,
   parentNoteId,
   hideParentNote,
+  // Removed interaction handlers from destructuring
 }: PostProps) {
   const router = useRouter()
   const { likes, reposts, isLoading } = useReactionCounts(id)
@@ -74,6 +76,7 @@ export function Post({
         id={id}
         likes={likes}
         reposts={reposts}
+        // Removed handlers passed down to PostActions
       />
     </Card>
   )

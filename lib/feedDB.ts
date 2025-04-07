@@ -1,13 +1,16 @@
 import { openDB, DBSchema, IDBPDatabase, StoreNames } from 'idb'
 
-interface BaseNote {
-  id: string
-  content: string
-  pubkey: string
-  created_at: number
+// BaseNote now includes fields common to INote/IEvent that we want to store
+export interface BaseNote { // Add export
+  id: string;
+  content: string;
+  pubkey: string;
+  created_at: number;
+  tags: string[][]; // Add tags
+  sig: string;      // Add sig
 }
 
-interface StoredNote extends BaseNote {
+export interface StoredNote extends BaseNote { // Add export keyword
   cached_at: number
 }
 
@@ -352,11 +355,16 @@ class FeedDB {
         return;
       }
       
-      // Transform BaseNotes to StoredNotes
+      // Transform BaseNotes to StoredNotes, ensuring tags and sig are included
       const storedNotes: StoredNote[] = notesToAdd.map(note => ({
-        ...note,
+        id: note.id,
+        content: note.content,
+        pubkey: note.pubkey,
+        created_at: note.created_at,
+        tags: note.tags || [], // Ensure tags are present
+        sig: note.sig || '',   // Ensure sig is present
         cached_at: now
-      }))
+      }));
       
       // Store the notes
       await Promise.all(
@@ -404,7 +412,7 @@ class FeedDB {
     const seen = new Set<string>() // Track seen note IDs for deduplication
 
     let cursor = before
-      ? await index.openCursor(IDBKeyRange.upperBound(before), 'prev')
+      ? await index.openCursor(IDBKeyRange.upperBound(before, true), 'prev') // Make upperBound exclusive
       : await index.openCursor(null, 'prev')
 
     const notes: StoredNote[] = []
