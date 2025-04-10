@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useMemo } from "react"
 import { Card, CardContent, CardHeader } from "./card"
 import { AuthorInfo } from "./author-info"
 import { useApna } from "@/components/providers/ApnaProvider"
@@ -231,7 +231,7 @@ export function ContentRenderer({ content, onHashtagClick, parentNoteId, hidePar
   const apna = useApna()
   const [referencedNotes, setReferencedNotes] = useState<{ [key: string]: ReferencedNote }>({})
   const [parentNote, setParentNote] = useState<ReferencedNote | null>(null)
-  const segments = parseContent(content)
+  const segments = useMemo(() => parseContent(content), [content])
 
   // Fetch parent note if parentNoteId is provided
   useEffect(() => {
