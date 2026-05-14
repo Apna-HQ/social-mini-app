@@ -131,24 +131,6 @@ export default function ThreadPage() {
             // Handle hashtag click if needed
           }}
         />
-        {replyingTo === note.id ? (
-          <ReplyForm
-            noteId={note.id}
-            onSubmit={(content) => handleReplySubmit(note.id, content)}
-          />
-        ) : (
-          <button
-            className="mt-2 text-primary hover:text-primary/90 text-sm font-medium"
-            onClick={() => {
-              if (noteRef.current) {
-                noteRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }
-              setReplyingTo(note.id);
-            }}
-          >
-            Reply to this note
-          </button>
-        )}
       </div>
     );
   }
@@ -243,6 +225,19 @@ export default function ThreadPage() {
 
         {/* Main Note */}
         <NotePost note={mainNote} isTarget={mainNote.id === id} />
+        {replyingTo === mainNote.id ? (
+          <ReplyForm
+            noteId={mainNote.id}
+            onSubmit={(content) => handleReplySubmit(mainNote.id, content)}
+          />
+        ) : (
+          <button
+            className="mt-2 text-primary hover:text-primary/90 text-sm font-medium"
+            onClick={() => setReplyingTo(mainNote.id)}
+          >
+            Reply to this note
+          </button>
+        )}
 
         {/* Replies */}
         <div className="space-y-4 mt-6">
