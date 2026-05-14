@@ -54,9 +54,7 @@ export default function ThreadPage() {
         // First fetch the current note
         const result = await fetchNoteAndReplies(id as string)
         console.log('Fetched note and replies:', result)
-        // Set the initial replyingTo state to the clicked note
-        setReplyingTo(id as string)
-        
+
         // Check if this is a reply and has a root note
         const rootNoteId = (result?.note?.tags as string[][])?.find(
           tag => tag[0] === "e" && tag[3] === "root"
@@ -133,22 +131,23 @@ export default function ThreadPage() {
             // Handle hashtag click if needed
           }}
         />
-        <button
-          className="mt-2 text-primary hover:text-primary/90 text-sm font-medium"
-          onClick={() => {
-            if (noteRef.current) {
-              noteRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-            setReplyingTo(note.id);
-          }}
-        >
-          Reply to this note
-        </button>
-        {replyingTo === note.id && (
-          <ReplyForm 
-            noteId={note.id} 
-            onSubmit={(content) => handleReplySubmit(note.id, content)} 
+        {replyingTo === note.id ? (
+          <ReplyForm
+            noteId={note.id}
+            onSubmit={(content) => handleReplySubmit(note.id, content)}
           />
+        ) : (
+          <button
+            className="mt-2 text-primary hover:text-primary/90 text-sm font-medium"
+            onClick={() => {
+              if (noteRef.current) {
+                noteRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+              setReplyingTo(note.id);
+            }}
+          >
+            Reply to this note
+          </button>
         )}
       </div>
     );
