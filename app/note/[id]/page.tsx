@@ -244,12 +244,6 @@ export default function ThreadPage() {
 
         {/* Main Note */}
         <NotePost note={mainNote} isTarget={mainNote.id === id} />
-        {replyingTo === mainNote.id && (
-          <ReplyForm 
-            noteId={mainNote.id} 
-            onSubmit={(content) => handleReplySubmit(mainNote.id, content)} 
-          />
-        )}
 
         {/* Replies */}
         <div className="space-y-4 mt-6">
