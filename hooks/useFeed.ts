@@ -1,18 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useApna } from "@/components/providers/ApnaProvider";
-import { nip19 } from "nostr-tools";
-// Removed incorrect import of IEvent from @apna/sdk
 import { feedDB, INITIAL_FETCH_SIZE, LOAD_MORE_SIZE, type StoredNote } from "@/lib/feedDB"; // Import feedDB, constants, and StoredNote type
 import type { INote } from "@apna/sdk";
-
-// Define the structure for decoded nprofile if not already globally available
-type DecodedNprofile = {
-  type: 'nprofile';
-  data: {
-    pubkey: string;
-    relays?: string[];
-  };
-};
 
 // Define the return type for the hook
 interface UseFeedResult {
@@ -65,12 +54,10 @@ export function useFeed(): UseFeedResult {
         }
       }
 
-     // Rely on type inference for the result of fetchFeed
-     const freshEvents = await apna.nostr.fetchFeed(
+     // social.v1.feed replaces the compat nostr.fetchFeed
+     const freshEvents = await apna.social!.v1.feed(
        'FOLLOWING_FEED',
-       latestTimestamp,
-       undefined,
-       fetchSize
+       { since: latestTimestamp, limit: fetchSize }
      );
      // Filter for kind 1 notes and map to INote if necessary (assuming IEvent structure matches INote for kind 1)
      // Assuming IEvent structure for kind 1 is compatible with INote or needs mapping
@@ -114,12 +101,10 @@ export function useFeed(): UseFeedResult {
     try {
      const timestamp = await feedDB.getLatestTimestamp(userPubkey);
 
-     // Rely on type inference for the result of fetchFeed
-     const freshEvents = await apna.nostr.fetchFeed(
+     // social.v1.feed replaces the compat nostr.fetchFeed
+     const freshEvents = await apna.social!.v1.feed(
        'FOLLOWING_FEED',
-       timestamp || undefined,
-       undefined,
-       20 // Fetch a fixed number for refresh
+       { since: timestamp || undefined, limit: 20 }
      );
      const freshNotes: INote[] = freshEvents.filter(event => event.kind === 1) as INote[];
 
@@ -194,12 +179,10 @@ export function useFeed(): UseFeedResult {
      // If cache didn't provide enough notes, fetch from network
      if (uniqueCachedNotes.length < LOAD_MORE_SIZE) {
       console.log(`[loadMore] Fetching from network before ${oldestNoteTimestamp}...`);
-      // Rely on type inference for the result of fetchFeed
-       const olderEvents = await apna.nostr.fetchFeed(
+      // social.v1.feed replaces the compat nostr.fetchFeed
+       const olderEvents = await apna.social!.v1.feed(
          'FOLLOWING_FEED',
-         undefined,
-         oldestNoteTimestamp, // Fetch notes older than the current oldest note
-         LOAD_MORE_SIZE
+         { until: oldestNoteTimestamp, limit: LOAD_MORE_SIZE }
        );
       const olderNotes: INote[] = olderEvents.filter(event => event.kind === 1) as INote[];
       console.log(`[loadMore] Fetched ${olderEvents.length} events from network, ${olderNotes.length} are notes.`);
@@ -243,21 +226,9 @@ export function useFeed(): UseFeedResult {
     const initialize = async () => {
       setLoading(true);
       try {
-        const userProfile = await apna.nostr.getActiveUserProfile();
-        let pubkey: string | null = null;
-        if (userProfile) {
-          try {
-            const decoded = nip19.decode(userProfile.nprofile) as DecodedNprofile;
-            if (decoded.type === 'nprofile' && decoded.data.pubkey) {
-              const npub = nip19.npubEncode(decoded.data.pubkey);
-              pubkey = nip19.decode(npub).data as string;
-            }
-          } catch (decodeError) {
-           console.error("Failed to decode nprofile:", decodeError);
-           // If decoding fails, we cannot reliably get the pubkey here.
-           // The logic relies on a valid nprofile.
-          }
-        }
+        // identity.v1.me() returns UserProfile with pubkey (hex) directly
+        const userProfile = await apna.identity!.v1.me();
+        const pubkey: string | null = userProfile?.pubkey ?? null;
 
         if (pubkey) {
           setUserPubkey(pubkey);

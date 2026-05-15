@@ -1,14 +1,14 @@
 import { feedReactionsDB, ReactionType } from '../feedReactionsDB'
-import { INostr, INoteLike, INoteRepost } from '@apna/sdk'
+import type { ApnaSocialDomain } from '@apna/sdk'
 
 /**
- * Adds a like reaction to a note using the nostr API
+ * Adds a like reaction to a note using the social domain API.
  * @param noteId The ID of the note
  * @param pubkey The public key of the user
- * @param nostr The nostr API instance
+ * @param social The apna.social domain instance
  * @returns Promise that resolves to true if successful
  */
-export async function likeNote(noteId: string, pubkey: string, nostr: INostr): Promise<boolean> {
+export async function likeNote(noteId: string, pubkey: string, social: ApnaSocialDomain): Promise<boolean> {
   if (!noteId || !pubkey) {
     console.error('Note ID and pubkey are required to like a note')
     return false
@@ -26,8 +26,8 @@ export async function likeNote(noteId: string, pubkey: string, nostr: INostr): P
       return true
     }
     
-    // Call the nostr API to like the note
-    const result = await nostr.likeNote(noteId)
+    // Call the social domain API to like the note
+    const result = await social.v1.like(noteId)
     
     if (result) {
       // Add the like reaction to our local database
@@ -51,13 +51,13 @@ export async function likeNote(noteId: string, pubkey: string, nostr: INostr): P
 }
 
 /**
- * Adds a repost reaction to a note using the nostr API
+ * Adds a repost reaction to a note using the social domain API.
  * @param noteId The ID of the note
  * @param pubkey The public key of the user
- * @param nostr The nostr API instance
+ * @param social The apna.social domain instance
  * @returns Promise that resolves to true if successful
  */
-export async function repostNote(noteId: string, pubkey: string, nostr: INostr): Promise<boolean> {
+export async function repostNote(noteId: string, pubkey: string, social: ApnaSocialDomain): Promise<boolean> {
   if (!noteId || !pubkey) {
     console.error('Note ID and pubkey are required to repost a note')
     return false
@@ -75,8 +75,8 @@ export async function repostNote(noteId: string, pubkey: string, nostr: INostr):
       return true
     }
     
-    // Call the nostr API to repost the note (empty quote content)
-    const result = await nostr.repostNote(noteId, '')
+    // Call the social domain API to repost the note
+    const result = await social.v1.repost(noteId)
     
     if (result) {
       // Add the repost reaction to our local database

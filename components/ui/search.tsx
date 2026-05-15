@@ -19,7 +19,7 @@ const suggestedUserNpubs = [
 ]
 
 export function Search() {
-  const { nostr } = useApna()
+  useApna()
   const [suggestedUsers, setSuggestedUsers] = useState<Array<{
     pubkey: string;
     npub: string;
@@ -60,7 +60,7 @@ export function Search() {
       setSuggestedUsers(users.filter(user => user !== undefined))
     }
     fetchProfiles()
-  }, [nostr])
+  }, [])
 
   const router = useRouter()
   const [searchInput, setSearchInput] = useState('')

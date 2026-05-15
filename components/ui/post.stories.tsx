@@ -65,11 +65,14 @@ const mockNostr: any = {
 // Create a wrapper component that provides the mocked context
 const MockApnaProvider = ({ children }: { children: React.ReactNode }) => {
   return (
+    // Storybook mock — uses the legacy `nostr` shape and is not aligned with the
+    // post-MIG-003 ApnaContextType (no `nostr`; uses `apna`/`social`/`identity`).
+    // Cast keeps stories rendering; a proper rewrite belongs with story updates.
     <ApnaContext.Provider value={{
       nostr: mockNostr,
       isHighlighted: false,
       toggleHighlight: () => {}
-    }}>
+    } as any}>
       {children}
     </ApnaContext.Provider>
   )

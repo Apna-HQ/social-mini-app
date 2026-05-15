@@ -36,28 +36,28 @@ export function useReactions({ noteId, pubkey }: UseReactionsProps): UseReaction
     if (!noteId || !pubkey) return
     
     try {
-      const success = await likeNote(noteId, pubkey, apna.nostr)
+      const success = await likeNote(noteId, pubkey, apna.social!)
       if (success) {
         refreshCounts()
       }
     } catch (error) {
       console.error('Error handling like:', error)
     }
-  }, [noteId, pubkey, refreshCounts, apna.nostr])
+  }, [noteId, pubkey, refreshCounts, apna.social])
 
   // Handle repost action
   const handleRepost = useCallback(async () => {
     if (!noteId || !pubkey) return
-    
+
     try {
-      const success = await repostNote(noteId, pubkey, apna.nostr)
+      const success = await repostNote(noteId, pubkey, apna.social!)
       if (success) {
         refreshCounts()
       }
     } catch (error) {
       console.error('Error handling repost:', error)
     }
-  }, [noteId, pubkey, refreshCounts, apna.nostr])
+  }, [noteId, pubkey, refreshCounts, apna.social])
 
   return {
     likes,

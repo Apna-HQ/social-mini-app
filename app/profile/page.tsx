@@ -8,7 +8,7 @@ import { userProfileDB } from "@/lib/userProfileDB"
 
 export default function ProfilePage() {
   const { profile: appProfile, updateProfileMetadata, publishNote } = useApp()
-  const { nostr } = useApna()
+  const { social } = useApna()
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [userMetadata, setUserMetadata] = useState<Record<string, any>>({})
   const [isEditing, setIsEditing] = useState(false)
@@ -45,7 +45,7 @@ export default function ProfilePage() {
 
       const fetchFreshProfile = async () => {
         try {
-          const freshProfile = await nostr.fetchUserProfile(appProfile.pubkey)
+          const freshProfile = await social!.v1.userProfile(appProfile.pubkey)
           const profileWithPubkey = {
             ...freshProfile,
             pubkey: appProfile.pubkey // Ensure pubkey is included
@@ -67,7 +67,7 @@ export default function ProfilePage() {
         await Promise.all(
           allUsers.map(async (pubkey) => {
             try {
-              const userMetadata = await nostr.fetchUserMetadata(pubkey)
+              const userMetadata = await social!.v1.userMetadata(pubkey)
               metadata[pubkey] = userMetadata
             } catch (error) {
               console.error(`Failed to fetch metadata for ${pubkey}:`, error)
@@ -80,7 +80,7 @@ export default function ProfilePage() {
 
       fetchData()
     }
-  }, [appProfile, nostr])
+  }, [appProfile, social])
 
   const handleEditStart = (data: { name: string; about: string }) => {
     setEditForm(data)
@@ -132,7 +132,7 @@ export default function ProfilePage() {
       onEditSave={handleEditSave}
       onEditCancel={handleEditCancel}
       onPublishNote={publishNote}
-      nostr={nostr}
+      social={social}
       userMetadata={userMetadata}
     />
   )

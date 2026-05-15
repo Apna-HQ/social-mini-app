@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useApna } from '../../components/providers/ApnaProvider'
 import { feedReactionsDB, ReactionType } from '../feedReactionsDB'
-import { INoteLike, INoteRepost } from '@apna/sdk'
+import type { NostrEvent } from '@apna/sdk'
 
 interface ReactionCounts {
   likes: number
@@ -26,7 +26,7 @@ export function useReactionCounts(noteId: string, refreshKey?: number): Reaction
     let isMounted = true
 
     const fetchCounts = async () => {
-      if (!noteId) return
+      if (!noteId || !apna.social) return
 
       try {
         // First get cached counts from the database
@@ -46,8 +46,8 @@ export function useReactionCounts(noteId: string, refreshKey?: number): Reaction
 
         // Then fetch fresh counts from the network, using since parameter to only get newer reactions
         const [likes, reposts] = await Promise.all([
-          apna.nostr.fetchNoteLikes(noteId, since),
-          apna.nostr.fetchNoteReposts(noteId, since)
+          apna.social!.v1.noteLikes(noteId, since),
+          apna.social!.v1.noteReposts(noteId, since)
         ])
 
         // Store the fresh reactions in the database
@@ -78,12 +78,12 @@ export function useReactionCounts(noteId: string, refreshKey?: number): Reaction
     return () => {
       isMounted = false
     }
-  }, [noteId, refreshKey, apna.nostr])
+  }, [noteId, refreshKey, apna.social])
 
   // Helper function to store reactions in the database
   const storeReactions = async (
-    likes: INoteLike[],
-    reposts: INoteRepost[],
+    likes: NostrEvent[],
+    reposts: NostrEvent[],
     noteId: string
   ) => {
     try {

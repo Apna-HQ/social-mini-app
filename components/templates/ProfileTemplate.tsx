@@ -13,7 +13,7 @@ import { useEffect, useState, useCallback } from "react"
 import { noteToPostProps } from "@/lib/utils/post"
 import { userNotesFeedDB, INITIAL_FETCH_SIZE, LOAD_MORE_SIZE } from "@/lib/userNotesFeedDB"
 import { DynamicEditProfile } from "@/components/ui/dynamic-edit-profile"
-import type { INote } from "@apna/sdk"
+import type { INote, ApnaSocialDomain } from "@apna/sdk"
 
 export interface UserProfile {
   metadata: {
@@ -52,8 +52,8 @@ interface ProfileTemplateProps {
   onFollowToggle?: () => Promise<void>
   onPublishNote?: (content: string) => Promise<void>
   
-  // Data fetching
-  nostr: any
+  // Data fetching — accepts the real social domain (or undefined during load)
+  social?: ApnaSocialDomain
   userMetadata?: Record<string, any>
 }
 
@@ -72,7 +72,7 @@ export function ProfileTemplate({
   onEditCancel,
   onFollowToggle,
   onPublishNote,
-  nostr,
+  social,
   userMetadata = {}
 }: ProfileTemplateProps) {
   const router = useRouter()
@@ -124,7 +124,7 @@ export function ProfileTemplate({
       const until = before || undefined
       const limit = before ? LOAD_MORE_SIZE : INITIAL_FETCH_SIZE
       
-      const freshEvents = await nostr.fetchUserFeed(pubkey, 'NOTES_FEED', since, until, limit)
+      const freshEvents = await social!.v1.userFeed(pubkey, 'NOTES_FEED', { since, until, limit })
       const freshNotes = freshEvents.filter((event: any): event is INote => event.kind === 1)
       
       // If we got fresh notes, add them to cache and update state
@@ -148,7 +148,7 @@ export function ProfileTemplate({
     } catch (error) {
       console.error("Failed to fetch user notes:", error)
     }
-  }, [nostr])
+  }, [social])
   
   // Load more notes
   const loadMoreNotes = async () => {

@@ -30,7 +30,7 @@ export function UserProfileCard({
 }: UserProfileCardProps) {
   const router = useRouter()
   const { profile } = useApp()
-  const { nostr } = useApna()
+  const { social } = useApna()
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isStale, setIsStale] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
@@ -84,7 +84,7 @@ export function UserProfileCard({
 
     const fetchFreshData = async () => {
       try {
-        const freshProfile = await nostr.fetchUserProfile(pubkey)
+        const freshProfile = await social!.v1.userProfile(pubkey)
         const profileWithPubkey = {
           ...freshProfile,
           pubkey // Ensure pubkey is included
@@ -100,7 +100,7 @@ export function UserProfileCard({
     }
 
     fetchData()
-  }, [pubkey, nostr, isVisible])
+  }, [pubkey, social, isVisible])
 
   const handleClick = () => {
     router.push(`/user/${pubkey}`)
@@ -110,9 +110,9 @@ export function UserProfileCard({
     e.stopPropagation()
     try {
       if (profile?.following.includes(pubkey)) {
-        await nostr.unfollowUser(pubkey)
+        await social!.v1.unfollow(pubkey)
       } else {
-        await nostr.followUser(pubkey)
+        await social!.v1.follow(pubkey)
       }
     } catch (error) {
       console.error("Failed to follow/unfollow user:", error)

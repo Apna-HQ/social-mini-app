@@ -1,7 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { INostr } from "@apna/sdk";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { EventName, type ApnaApp, type ApnaIdentityDomain, type ApnaSocialDomain } from "@apna/sdk";
+import { setCustomiseHighlight } from "@apna/sdk/ui";
 
 interface ApnaContextType {
   remoteComponentSelections?: {
@@ -9,9 +10,13 @@ interface ApnaContextType {
       [remoteModuleName: string]: string
     }
   }
+  apna?: ApnaApp;
   toggleHighlight: () => void;
   isHighlighted: boolean;
-  nostr: INostr;
+  /** High-level social domain — use apna.social.v1.* for new call sites. */
+  social?: ApnaSocialDomain;
+  /** High-level identity domain — use apna.identity.v1.* for new call sites. */
+  identity?: ApnaIdentityDomain;
 }
 
 export const ApnaContext = createContext<ApnaContextType | null>(null);
@@ -25,42 +30,49 @@ export const useApna = () => {
 };
 
 export function ApnaProvider({ children }: { children: React.ReactNode }) {
-  const [nostr, setNostr] = useState<INostr>();
+  const [apna, setApna] = useState<ApnaApp>();
+  const [social, setSocial] = useState<ApnaSocialDomain>();
+  const [identity, setIdentity] = useState<ApnaIdentityDomain>();
   const [isHighlighted, setIsHighlighted] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const toggleHighlight = () => {
+  const toggleHighlight = useCallback(() => {
     setIsHighlighted(prev => {
-      console.log(`toggled from ${prev} to ${!prev}`)
-      return !prev
+      const next = !prev
+      setCustomiseHighlight(next)
+      return next
     })
-  }
+  }, [])
 
-  if (typeof window !== "undefined") {
-    // @ts-ignore
-    window.toggleHighlight = toggleHighlight
-  }
-  
   useEffect(() => {
-    console.log("useEffect of ApnaProvider!!")
     if (typeof window !== "undefined") {
       const init = async () => {
         const { ApnaApp } = await import("@apna/sdk");
         const apna = new ApnaApp({ appId: "apna-nostr-mvp-1" });
-        setNostr(apna.nostr);
-        setLoading(false);
-        console.log(
-          "nostr.getProfile return value: ",
-          await apna.nostr.getActiveUserProfile()
+        await apna.ready;
+        const offHighlight = apna.on(
+          EventName.CustomiseToggleHighlight,
+          toggleHighlight
         );
+        setApna(apna);
+        setSocial(apna.social);
+        setIdentity(apna.identity);
+        setLoading(false);
+        return offHighlight;
       };
-      init();
+      let cleanup: (() => void) | undefined;
+      void init().then((offHighlight) => {
+        cleanup = offHighlight;
+      });
+      return () => {
+        cleanup?.();
+      };
     }
-  }, []);
+  }, [toggleHighlight]);
 
-  if (!nostr || loading) return <div className="flex items-center justify-center min-h-screen">Booting the App...</div>;  
+  if (!apna || loading) return <div className="flex items-center justify-center min-h-screen">Booting the App...</div>;
 
   return (
-    <ApnaContext.Provider value={{ nostr, isHighlighted, toggleHighlight }}>{children}</ApnaContext.Provider>
+    <ApnaContext.Provider value={{ apna, social, identity, isHighlighted, toggleHighlight }}>{children}</ApnaContext.Provider>
   );
 }

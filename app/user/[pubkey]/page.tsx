@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 
 export default function UserProfilePage({ params }: { params: { pubkey: string } }) {
   const { profile } = useApp()
-  const { nostr } = useApna()
+  const { social } = useApna()
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isStale, setIsStale] = useState(false)
 
@@ -37,7 +37,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
 
     const fetchFreshProfile = async () => {
       try {
-        const freshProfile = await nostr.fetchUserProfile(params.pubkey)
+        const freshProfile = await social!.v1.userProfile(params.pubkey)
         const profileWithPubkey = {
           ...freshProfile,
           pubkey: params.pubkey // Ensure pubkey is included
@@ -53,14 +53,14 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
     }
 
     fetchData()
-  }, [params.pubkey, nostr])
+  }, [params.pubkey, social])
 
   const handleFollowToggle = async () => {
     try {
       if (profile && profile.following.includes(params.pubkey)) {
-        await nostr.unfollowUser(params.pubkey)
+        await social!.v1.unfollow(params.pubkey)
       } else {
-        await nostr.followUser(params.pubkey)
+        await social!.v1.follow(params.pubkey)
       }
     } catch (error) {
       console.error("Failed to follow/unfollow user:", error)
@@ -87,7 +87,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
       showFollowButton={true}
       isStale={isStale}
       onFollowToggle={handleFollowToggle}
-      nostr={nostr}
+      social={social}
     />
   )
 }

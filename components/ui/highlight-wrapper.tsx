@@ -2,7 +2,7 @@
 
 import { ReactNode, useState } from "react"
 import { BottomSheet, SelectOption } from "./bottom-sheet"
-import { loadRemote, registerRemotes } from '@/utils/federation'
+import { loadRemote, registerRemotes } from '@apna/sdk/ui'
 
 interface HighlightWrapperProps {
   children: ReactNode

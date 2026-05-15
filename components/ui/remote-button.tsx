@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { loadRemote, registerRemotes } from '@/utils/federation';
+import { loadRemote, registerRemotes } from '@apna/sdk/ui';
 
 interface RemoteButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;

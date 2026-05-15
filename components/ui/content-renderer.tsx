@@ -239,7 +239,7 @@ export function ContentRenderer({ content, onHashtagClick, parentNoteId, hidePar
       if (!parentNoteId) return
       
       try {
-        const note = await apna.nostr.fetchNote(parentNoteId)
+        const note = await apna.social!.v1.note(parentNoteId)
         if (note) {
           setParentNote({
             id: note.id,
@@ -269,7 +269,7 @@ export function ContentRenderer({ content, onHashtagClick, parentNoteId, hidePar
       
       for (const noteId of noteIds) {
         try {
-          const note = await apna.nostr.fetchNote(noteId)
+          const note = await apna.social!.v1.note(noteId)
           if (note) {
             fetchedNotes[noteId] = {
               id: note.id,

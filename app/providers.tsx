@@ -1,16 +1,7 @@
 "use client"
 import { createContext, useCallback, useContext, useEffect, useState } from "react"
-import { nip19 } from "nostr-tools"
 import { useApna } from "@/components/providers/ApnaProvider";
 import type { BaseNote } from "@/lib/feedDB"; // Import BaseNote
-
-type DecodedNprofile = {
-  type: 'nprofile'
-  data: {
-    pubkey: string
-    relays?: string[]
-  }
-}
 
 interface Profile {
   metadata: {
@@ -64,28 +55,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Fetch initial profile info (Keep this part)
   const fetchInitialProfile = async () => {
     try {
-      const userProfile = await apna.nostr.getActiveUserProfile();
-      let userPubkey: string | null = null;
+      // identity.v1.me() returns UserProfile with pubkey (hex) directly
+      const userProfile = await apna.identity!.v1.me();
 
-      if (userProfile) {
-        userPubkey = (() => {
-          try {
-            const decoded = nip19.decode(userProfile.nprofile) as DecodedNprofile;
-            if (decoded.type === 'nprofile' && decoded.data.pubkey) {
-              const npub = nip19.npubEncode(decoded.data.pubkey);
-              return nip19.decode(npub).data as string;
-            }
-          } catch (e) {
-            console.error("Failed to decode nprofile for initial profile fetch:", e);
-          }
-          return null;
-        })();
-      }
-
-      if (userPubkey) {
+      if (userProfile && userProfile.pubkey) {
         setProfile({
           metadata: userProfile.metadata,
-          pubkey: userPubkey,
+          pubkey: userProfile.pubkey,
           stats: { posts: 0 }, // Initial stats, might be updated elsewhere
           followers: userProfile.followers || [],
           following: userProfile.following || [],
@@ -107,7 +83,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!content.trim()) return
     try {
       await ensureApnaInitialized()
-      const result = await apna.nostr.publishNote(content)
+      const result = await apna.social!.v1.publishNote(content)
     } catch (error) {
       console.error("Failed to publish note:", error)
       throw error
@@ -121,7 +97,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     
     try {
       await ensureApnaInitialized()
-      const result = await apna.nostr.likeNote(id)
+      const result = await apna.social!.v1.like(id)
       // Don't add reactions to feedDB or update notes state
       // as reactions are not notes themselves but reaction events
     } catch (error) {
@@ -137,7 +113,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     
     try {
       await ensureApnaInitialized()
-      const result = await apna.nostr.repostNote(id, '')
+      const result = await apna.social!.v1.repost(id)
       if (result) {
         // Map INoteRepost to BaseNote before adding to DB
         const repostForDb: BaseNote = {
@@ -166,7 +142,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     
     try {
       await ensureApnaInitialized()
-      const result = await apna.nostr.replyToNote(id, content)
+      const result = await apna.social!.v1.reply(id, content)
       if (result) {
         // Map INoteReply to BaseNote before adding to DB
         const replyForDb: BaseNote = {
@@ -191,7 +167,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateProfileMetadata = async (metadata: { name?: string, about?: string }) => {
     try {
       await ensureApnaInitialized()
-      const result = await apna.nostr.updateProfileMetadata(metadata)
+      const result = await apna.identity!.v1.updateProfile(metadata)
       if (result) {
         setProfile({
           ...profile!,
@@ -207,7 +183,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const fetchNoteAndReplies = async (id: string) => {
     try {
       await ensureApnaInitialized()
-      const result = await apna.nostr.fetchNoteAndReplies(id)
+      const result = await apna.social!.v1.noteAndReplies(id)
       return result
     } catch (error) {
       console.error("Failed to fetch note and replies:", error)
@@ -225,7 +201,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     try {
       await ensureApnaInitialized()
-      const fetchedProfile = await apna.nostr.fetchUserProfile(pubkey)
+      const fetchedProfile = await apna.social!.v1.userProfile(pubkey)
 
       if (fetchedProfile) {
         const profileToCache = {
