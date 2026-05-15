@@ -9,6 +9,9 @@ interface UseFeedResult {
   loading: boolean;
   loadingMore: boolean;
   refreshing: boolean;
+  /** Last error from the bridge / network feed call, surfaced for the UI
+   *  so empty results from a failure don't masquerade as "no posts". */
+  error: string | null;
   loadMore: () => Promise<void>;
   refreshFeed: () => Promise<void>;
   userPubkey: string | null;
@@ -19,6 +22,7 @@ export function useFeed(): UseFeedResult {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   // Removed lastTimestamp state
   const [userPubkey, setUserPubkey] = useState<string | null>(null);
   const apna = useApna();
@@ -32,6 +36,7 @@ export function useFeed(): UseFeedResult {
       return;
     }
    setLoading(true);
+   setError(null);
    try {
      const cachedStoredNotes: StoredNote[] = await feedDB.getNotes(userPubkey, INITIAL_FETCH_SIZE);
      const cachedNotes: INote[] = cachedStoredNotes.map(storedNoteToINote);
@@ -86,8 +91,10 @@ export function useFeed(): UseFeedResult {
     }
     // Removed logic that set lastTimestamp based on current notes
 
-    } catch (error) {
-      console.error("Failed to fetch initial feed:", error);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("Failed to fetch initial feed:", err);
+      setError(message);
     } finally {
       setLoading(false); // Set loading false after all operations
     }
@@ -260,6 +267,7 @@ export function useFeed(): UseFeedResult {
     loading,
     loadingMore,
     refreshing,
+    error,
     loadMore,
     refreshFeed,
     userPubkey,

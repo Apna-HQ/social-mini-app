@@ -13,7 +13,7 @@ import { Loader2 } from "lucide-react"; // For loading spinner icon
 export default function Home() {
   const router = useRouter()
   // Get feed-specific state and actions from useFeed
-  const { notes, loading, loadingMore, refreshing, loadMore, refreshFeed } = useFeed();
+  const { notes, loading, loadingMore, refreshing, error, loadMore, refreshFeed } = useFeed();
   // Get other actions and scroll position from useApp
   // Removed saveScrollPosition and savedScrollAnchorId from destructuring
   const { publishNote, likeNote, repostNote, replyToNote } = useApp();
@@ -65,7 +65,21 @@ export default function Home() {
               <span className="text-sm">Loading your feed…</span>
             </div>
           )}
-          {notes.length === 0 && !loading && (
+          {notes.length === 0 && !loading && error && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-6 text-center">
+              <p className="text-sm font-medium text-destructive">Couldn&apos;t load your feed</p>
+              <p className="mt-1 text-xs text-muted-foreground">{error}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => refreshFeed()}
+              >
+                Try again
+              </Button>
+            </div>
+          )}
+          {notes.length === 0 && !loading && !error && (
             <div className="text-center py-8 text-muted-foreground">
               No posts yet. Follow some users to see their posts here!
             </div>
