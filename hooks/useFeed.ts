@@ -38,10 +38,9 @@ export function useFeed(): UseFeedResult {
 
      if (cachedNotes.length > 0) {
         setNotes(cachedNotes);
-        // Removed setLastTimestamp call
-        // Don't set loading false yet, fetch fresh notes first
-      } else {
-        // If no cache, set loading false only after network fetch attempt
+        // Show cached notes immediately so the user isn't staring at a spinner
+        // while we fan out the network query in the background.
+        setLoading(false);
       }
 
       // Fetch fresh notes regardless of cache state initially
