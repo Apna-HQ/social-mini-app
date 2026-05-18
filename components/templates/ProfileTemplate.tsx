@@ -124,7 +124,15 @@ export function ProfileTemplate({
       const until = before || undefined
       const limit = before ? LOAD_MORE_SIZE : INITIAL_FETCH_SIZE
       
-      const freshEvents = await social!.v1.userFeed(pubkey, 'NOTES_FEED', { since, until, limit })
+      if (!social) {
+        if (cachedNotes.length === 0) {
+          setUserNotes([])
+          setHasMore(false)
+        }
+        return
+      }
+
+      const freshEvents = await social.v1.userFeed(pubkey, 'NOTES_FEED', { since, until, limit })
       const freshNotes = freshEvents.filter((event: any): event is INote => event.kind === 1)
       
       // If we got fresh notes, add them to cache and update state
@@ -187,8 +195,8 @@ export function ProfileTemplate({
 
   if (!userProfile) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-screen-md mx-auto py-4 px-4">
+      <div className="min-h-screen bg-background pb-24 md:pb-0">
+        <div className="mx-auto max-w-screen-md px-4 py-4">
           <div className="text-center py-8 text-muted-foreground">
             Loading profile...
           </div>
@@ -214,7 +222,7 @@ export function ProfileTemplate({
           )}
 
           {/* Profile Header */}
-          <div className="mb-6">
+          <div className="mb-6 rounded-lg border border-border/80 bg-card p-4">
             {isEditing ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-4">

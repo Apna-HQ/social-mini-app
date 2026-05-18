@@ -15,7 +15,7 @@ export function Fab({ onPublish }: FabProps) {
     <>
       <button
         onClick={() => setIsModalOpen(true)}
-        className="fixed bottom-20 right-4 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors"
+        className="fixed bottom-24 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-[0_10px_28px_rgba(40,30,20,0.25)] transition-colors hover:bg-accent/90 md:bottom-6"
         aria-label="Create Note"
       >
         <Edit className="w-6 h-6" />

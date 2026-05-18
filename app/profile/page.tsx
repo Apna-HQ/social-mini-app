@@ -19,7 +19,7 @@ export default function ProfilePage() {
   })
 
   useEffect(() => {
-    if (appProfile) {
+    if (appProfile && social) {
       const fetchData = async () => {
         try {
           // Check cache first for profile

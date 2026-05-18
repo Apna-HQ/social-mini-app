@@ -5,8 +5,8 @@ export const dynamic = 'force-dynamic'
 
 export default function SearchPage() {
   return (
-    <main className="min-h-screen bg-background pb-20">
-      <div className="max-w-screen-md mx-2 py-4">
+    <main className="min-h-screen bg-background pb-24 md:pb-0">
+      <div className="mx-auto max-w-screen-md px-4 py-4">
         <Search />
       </div>
     </main>

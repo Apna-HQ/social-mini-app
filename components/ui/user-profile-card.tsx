@@ -57,7 +57,7 @@ export function UserProfileCard({
   }, [])
 
   useEffect(() => {
-    if (!isVisible) return
+    if (!isVisible || !social) return
 
     const fetchData = async () => {
       try {
@@ -108,6 +108,8 @@ export function UserProfileCard({
 
   const handleFollowToggle = async (e: React.MouseEvent) => {
     e.stopPropagation()
+    if (!social) return
+
     try {
       if (profile?.following.includes(pubkey)) {
         await social!.v1.unfollow(pubkey)

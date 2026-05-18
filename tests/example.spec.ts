@@ -25,19 +25,21 @@ test('test', async ({page}) => {
   
   // Get the iframe element
   const iframeElement = await page.$('iframe');
+  expect(iframeElement).not.toBeNull();
   
   // Get the iframe's content frame
-  const frame = await iframeElement.contentFrame();
+  const frame = await iframeElement!.contentFrame();
+  expect(frame).not.toBeNull();
   
   // Wait for the iframe content to be fully loaded
-  await frame.waitForLoadState('load');
+  await frame!.waitForLoadState('load');
   
   // Optional: Add a small timeout to ensure everything is settled
   await page.waitForTimeout(10000);
 
-  await expect(frame.getByRole('button', { name: 'Profile' })).toBeVisible();
-  await frame.getByRole('button', { name: 'Profile' }).click();
-  await frame.waitForTimeout(10000);
+  await expect(frame!.getByRole('button', { name: 'Profile' })).toBeVisible();
+  await frame!.getByRole('button', { name: 'Profile' }).click();
+  await frame!.waitForTimeout(10000);
   
   // Optional: Verify the iframe has loaded by checking if a specific element exists
   // Uncomment and modify the selector based on your iframe content

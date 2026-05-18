@@ -19,9 +19,8 @@ export interface PostProps {
   timestamp: number
   onHashtagClick?: (hashtag: string) => void
   isReply?: boolean
-  parentNoteId?: string;
-  hideParentNote?: boolean;
-  // Removed interaction handlers from props
+  parentNoteId?: string
+  hideParentNote?: boolean
 }
 
 export function Post({
@@ -30,13 +29,11 @@ export function Post({
   author,
   timestamp,
   onHashtagClick,
-  isReply,
   parentNoteId,
   hideParentNote,
-  // Removed interaction handlers from destructuring
 }: PostProps) {
   const router = useRouter()
-  const { likes, reposts, isLoading } = useReactionCounts(id)
+  const { likes, reposts } = useReactionCounts(id)
   
   const handleClick = () => {
     router.push(`/note/${id}`)
@@ -49,17 +46,17 @@ export function Post({
 
   return (
     <Card
-      className="mb-4 hover:bg-accent/5 transition-colors cursor-pointer"
+      className="mb-0 cursor-pointer rounded-none border-x-0 border-t-0 border-border/80 bg-card px-4 py-4 shadow-none transition-colors hover:bg-secondary/40 sm:rounded-lg sm:border sm:px-5"
       onClick={handleClick}
     >
-      <CardHeader className="pb-3">
+      <CardHeader className="p-0 pb-3">
         <AuthorInfo
           pubkey={author.pubkey}
           onClick={handleUserClick}
           timestamp={timestamp}
         />
       </CardHeader>
-      <CardContent className="pb-3">
+      <CardContent className="p-0">
         <ExpandableContent
           content={
             <ContentRenderer
@@ -76,7 +73,7 @@ export function Post({
         id={id}
         likes={likes}
         reposts={reposts}
-        // Removed handlers passed down to PostActions
+        className="border-0"
       />
     </Card>
   )

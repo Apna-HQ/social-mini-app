@@ -15,6 +15,8 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
   const [isStale, setIsStale] = useState(false)
 
   useEffect(() => {
+    if (!social) return
+
     const fetchData = async () => {
       try {
         // Check cache first for profile
@@ -56,6 +58,8 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
   }, [params.pubkey, social])
 
   const handleFollowToggle = async () => {
+    if (!social) return
+
     try {
       if (profile && profile.following.includes(params.pubkey)) {
         await social!.v1.unfollow(params.pubkey)

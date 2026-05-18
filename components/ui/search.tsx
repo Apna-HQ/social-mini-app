@@ -67,15 +67,15 @@ export function Search() {
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState('')
 
-  const handleSearch = async () => {
+  const handleSearch = async (value = searchInput) => {
     try {
       setError('')
-      let pubkey = searchInput
+      let pubkey = value
 
       // Check if input is npub and convert to hex pubkey
-      if (searchInput.startsWith('npub')) {
+      if (value.startsWith('npub')) {
         try {
-          const decoded = nip19.decode(searchInput)
+          const decoded = nip19.decode(value)
           if (decoded.type === 'npub') {
             pubkey = decoded.data
           }
@@ -179,7 +179,7 @@ export function Search() {
               if (qrData.startsWith('npub') || /^[0-9a-f]{64}$/.test(qrData)) {
                 cleanup()
                 setSearchInput(qrData)
-                handleSearch()
+                handleSearch(qrData)
                 return
               }
             }
@@ -212,7 +212,7 @@ export function Search() {
           placeholder="Enter npub or public key"
           className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
         />
-        <Button onClick={handleSearch}>Search</Button>
+        <Button onClick={() => handleSearch()}>Search</Button>
       </div>
       
       <Button 
