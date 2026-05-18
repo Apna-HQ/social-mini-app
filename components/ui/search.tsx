@@ -3,11 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from './button'
-import { userProfileDB } from '@/lib/userProfileDB'
 import { nip19 } from 'nostr-tools'
 import { useApna } from '@/components/providers/ApnaProvider'
 import { UserProfileCard } from './user-profile-card'
-import { IUserMetadata } from '@apna/sdk'
 
 // List of suggested user npubs
 const suggestedUserNpubs = [
@@ -34,21 +32,9 @@ export function Search() {
           try {
             const decoded = nip19.decode(npub)
             if (decoded.type === 'npub') {
-              // Try userProfileDB first
-              // const result = await userProfileDB.getProfile(decoded.data)
-              // if (result?.profile) {
-              //   return {
-              //     pubkey: decoded.data,
-              //     npub,
-              //     // metadata: result.profile.metadata
-              //   }
-              // }
-              // Fallback to apna.nostr.fetchUserMetadata
-              // const metadata = await nostr.fetchUserMetadata(npub)
               return {
                 pubkey: decoded.data,
                 npub,
-                // metadata
               }
             }
           } catch (e) {

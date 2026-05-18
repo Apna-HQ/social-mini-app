@@ -6,7 +6,6 @@ import { Button } from "./button"
 import { useEffect, useState, useRef } from "react"
 import { useApp } from "@/app/providers"
 import { useApna } from "@/components/providers/ApnaProvider"
-import { userProfileDB } from "@/lib/userProfileDB"
 import { NpubDisplay } from "@/components/atoms/NpubDisplay"
 import { hexToNpub, trimNpub } from "@/lib/utils/nostr"
 
@@ -32,7 +31,6 @@ export function UserProfileCard({
   const { profile } = useApp()
   const { social } = useApna()
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
-  const [isStale, setIsStale] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
@@ -61,41 +59,13 @@ export function UserProfileCard({
 
     const fetchData = async () => {
       try {
-        // Check cache first
-        const cachedData = await userProfileDB.getProfile(pubkey)
-        
-        if (cachedData) {
-          // Use cached data immediately
-          setUserProfile(cachedData.profile)
-          setIsStale(cachedData.isStale)
-          
-          // If data is stale, fetch fresh data in background
-          if (cachedData.isStale) {
-            fetchFreshData()
-          }
-        } else {
-          // No cache, fetch fresh data
-          await fetchFreshData()
-        }
+        const freshProfile = await social.v1.userProfile(pubkey)
+        setUserProfile({
+          ...freshProfile,
+          pubkey
+        })
       } catch (error) {
         console.error("Failed to fetch user data:", error)
-      }
-    }
-
-    const fetchFreshData = async () => {
-      try {
-        const freshProfile = await social!.v1.userProfile(pubkey)
-        const profileWithPubkey = {
-          ...freshProfile,
-          pubkey // Ensure pubkey is included
-        }
-        setUserProfile(profileWithPubkey)
-        setIsStale(false)
-
-        // Update cache
-        await userProfileDB.updateProfile(profileWithPubkey)
-      } catch (error) {
-        console.error("Failed to fetch fresh data:", error)
       }
     }
 
@@ -142,11 +112,6 @@ export function UserProfileCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="font-medium truncate">{displayName}</p>
-          {isStale && userProfile && (
-            <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full animate-pulse">
-              Updating...
-            </div>
-          )}
         </div>
         {displayAbout ? (
           <p className="text-sm text-muted-foreground truncate">{displayAbout}</p>

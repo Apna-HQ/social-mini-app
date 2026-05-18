@@ -4,7 +4,6 @@ import { useApp } from "../providers"
 import { useApna } from "@/components/providers/ApnaProvider"
 import { useState, useEffect } from "react"
 import { ProfileTemplate, UserProfile } from "@/components/templates/ProfileTemplate"
-import { userProfileDB } from "@/lib/userProfileDB"
 
 export default function ProfilePage() {
   const { profile: appProfile, updateProfileMetadata, publishNote } = useApp()
@@ -12,7 +11,6 @@ export default function ProfilePage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [userMetadata, setUserMetadata] = useState<Record<string, any>>({})
   const [isEditing, setIsEditing] = useState(false)
-  const [isStale, setIsStale] = useState(false)
   const [editForm, setEditForm] = useState({
     name: '',
     about: ''
@@ -22,19 +20,7 @@ export default function ProfilePage() {
     if (appProfile && social) {
       const fetchData = async () => {
         try {
-          // Check cache first for profile
-          const cachedData = await userProfileDB.getProfile(appProfile.pubkey)
-          
-          if (cachedData) {
-            // Use cached data immediately
-            setUserProfile(cachedData.profile)
-            setIsStale(cachedData.isStale)
-            
-            fetchFreshProfile()
-          } else {
-            // No cache, fetch fresh data
-            await fetchFreshProfile()
-          }
+          await fetchFreshProfile()
 
           // Fetch metadata for followers and following
           await fetchMetadata()
@@ -51,10 +37,6 @@ export default function ProfilePage() {
             pubkey: appProfile.pubkey // Ensure pubkey is included
           }
           setUserProfile(profileWithPubkey)
-          setIsStale(false)
-
-          // Update cache
-          await userProfileDB.updateProfile(profileWithPubkey)
         } catch (error) {
           console.error("Failed to fetch fresh profile:", error)
         }
@@ -126,7 +108,6 @@ export default function ProfilePage() {
       showEditProfile={true}
       showFab={true}
       isEditing={isEditing}
-      isStale={isStale}
       editForm={editForm}
       onEditStart={handleEditStart}
       onEditSave={handleEditSave}

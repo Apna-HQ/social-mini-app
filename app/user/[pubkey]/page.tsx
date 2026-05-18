@@ -3,7 +3,6 @@
 import { useApp } from "../../providers"
 import { useApna } from "@/components/providers/ApnaProvider"
 import { useEffect, useState } from "react"
-import { userProfileDB } from "@/lib/userProfileDB"
 import { ProfileTemplate, UserProfile } from "@/components/templates/ProfileTemplate"
 
 export const dynamic = 'force-dynamic'
@@ -12,26 +11,13 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
   const { profile } = useApp()
   const { social } = useApna()
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
-  const [isStale, setIsStale] = useState(false)
 
   useEffect(() => {
     if (!social) return
 
     const fetchData = async () => {
       try {
-        // Check cache first for profile
-        const cachedData = await userProfileDB.getProfile(params.pubkey)
-        
-        if (cachedData) {
-          // Use cached data immediately
-          setUserProfile(cachedData.profile)
-          setIsStale(cachedData.isStale)
-          
-          fetchFreshProfile()
-        } else {
-          // No cache, fetch fresh data
-          await fetchFreshProfile()
-        }
+        await fetchFreshProfile()
       } catch (error) {
         console.error("Failed to fetch user data:", error)
       }
@@ -45,10 +31,6 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
           pubkey: params.pubkey // Ensure pubkey is included
         }
         setUserProfile(profileWithPubkey)
-        setIsStale(false)
-
-        // Update cache
-        await userProfileDB.updateProfile(profileWithPubkey)
       } catch (error) {
         console.error("Failed to fetch fresh profile:", error)
       }
@@ -89,7 +71,6 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
       isCurrentUser={profile?.pubkey === params.pubkey}
       showBackButton={true}
       showFollowButton={true}
-      isStale={isStale}
       onFollowToggle={handleFollowToggle}
       social={social}
     />

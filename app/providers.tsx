@@ -192,26 +192,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   const fetchUserProfile = async (pubkey: string): Promise<Profile | null> => {
-    const { userProfileDB } = await import('@/lib/userProfileDB')
-    const cachedProfile = await userProfileDB.getProfile(pubkey)
-
-    if (cachedProfile && !cachedProfile.isStale) {
-      return cachedProfile.profile
-    }
-
     try {
       await ensureApnaInitialized()
       const fetchedProfile = await apna.social!.v1.userProfile(pubkey)
 
       if (fetchedProfile) {
-        const profileToCache = {
-          pubkey: pubkey,
-          metadata: fetchedProfile.metadata,
-          followers: fetchedProfile.followers || [],
-          following: fetchedProfile.following || []
-        }
-        await userProfileDB.updateProfile(profileToCache)
-
         return {
           metadata: fetchedProfile.metadata,
           pubkey: pubkey,

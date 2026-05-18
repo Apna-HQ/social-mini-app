@@ -10,14 +10,14 @@ than calling Nostr relays directly.
 - TypeScript, Tailwind CSS, shadcn/ui-style tokens (`baseColor: slate`), Radix UI
 - `@module-federation/enhanced` — exposes/consumes federated components
 - `@apna/sdk` (`ApnaProvider` / `useApna`) — all Nostr access goes through the host bridge
-- `idb` — local feed/profile/reaction caches
+- `idb` — local feed/reaction caches; profile metadata is cached by the host bridge
 - Storybook (port 6006) + Playwright e2e (port 6007)
 
 ## Layout
 
 - `app/` — routes: `note`, `profile`, `user`, `search`; `providers.tsx` wires `ApnaProvider` → `AppProvider`
 - `components/` — atomic design: `atoms/` → `molecules/` → `organisms/` → `templates/`, plus `ui/` (primitives) and `providers/`
-- `lib/` — IndexedDB layers (`feedDB`, `feedReactionsDB`, `userNotesFeedDB`, `userProfileDB`), `hooks/`, `utils/`
+- `lib/` — IndexedDB layers (`feedDB`, `feedReactionsDB`, `userNotesFeedDB`), `hooks/`, `utils/`
 - `hooks/useFeed.ts` — main feed hook
 - `utils/federation.ts` — Module Federation wiring
 - `stories/`, `tests/`, `docs/`

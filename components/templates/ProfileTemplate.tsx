@@ -36,7 +36,6 @@ interface ProfileTemplateProps {
   showEditProfile?: boolean
   showFollowButton?: boolean
   showFab?: boolean
-  isStale?: boolean
   
   // Edit profile related props
   isEditing?: boolean
@@ -64,7 +63,6 @@ export function ProfileTemplate({
   showEditProfile = false,
   showFollowButton = false,
   showFab = false,
-  isStale = false,
   isEditing = false,
   editForm = { name: '', about: '' },
   onEditStart,
@@ -302,11 +300,6 @@ export function ProfileTemplate({
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <h1 className="text-2xl font-bold">{userProfile.metadata.name || "Unknown"}</h1>
-                      {isStale && (
-                        <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full animate-pulse">
-                          Updating...
-                        </div>
-                      )}
                     </div>
                     <NpubDisplay pubkey={userProfile.pubkey} className="text-sm text-muted-foreground" />
                     
