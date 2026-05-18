@@ -4,6 +4,11 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { EventName, type ApnaApp, type ApnaIdentityDomain, type ApnaSocialDomain } from "@apna/sdk";
 import { setCustomiseHighlight } from "@apna/sdk/ui";
 
+const HOST_THEME_CHANGED_EVENT = "theme:changed";
+
+type ApnaEventName = (typeof EventName)[keyof typeof EventName];
+type HostResolvedTheme = "light" | "dark";
+
 interface ApnaContextType {
   remoteComponentSelections?: {
     [appId: string]: {
@@ -44,6 +49,11 @@ export function ApnaProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
+  const applyHostTheme = useCallback((theme: HostResolvedTheme) => {
+    document.documentElement.classList.toggle("dark", theme === "dark")
+    document.documentElement.style.colorScheme = theme
+  }, [])
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const init = async () => {
@@ -54,11 +64,21 @@ export function ApnaProvider({ children }: { children: React.ReactNode }) {
           EventName.CustomiseToggleHighlight,
           toggleHighlight
         );
+        const offTheme = apna.on(
+          HOST_THEME_CHANGED_EVENT as ApnaEventName,
+          (payload) => {
+            if (!isHostThemePayload(payload)) return
+            applyHostTheme(payload.theme)
+          }
+        )
         setApna(apna);
         setSocial(apna.social);
         setIdentity(apna.identity);
         setLoading(false);
-        return offHighlight;
+        return () => {
+          offHighlight()
+          offTheme()
+        };
       };
       let cleanup: (() => void) | undefined;
       void init().then((offHighlight) => {
@@ -68,11 +88,19 @@ export function ApnaProvider({ children }: { children: React.ReactNode }) {
         cleanup?.();
       };
     }
-  }, [toggleHighlight]);
+  }, [applyHostTheme, toggleHighlight]);
 
   if (!apna || loading) return <div className="flex items-center justify-center min-h-screen">Booting the App...</div>;
 
   return (
     <ApnaContext.Provider value={{ apna, social, identity, isHighlighted, toggleHighlight }}>{children}</ApnaContext.Provider>
   );
+}
+
+function isHostThemePayload(
+  payload: unknown
+): payload is { theme: HostResolvedTheme } {
+  if (!payload || typeof payload !== "object") return false
+  const theme = (payload as { theme?: unknown }).theme
+  return theme === "dark" || theme === "light"
 }
