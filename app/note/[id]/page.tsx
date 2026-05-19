@@ -1,256 +1,233 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useMemo, useState } from "react"
+import type React from "react"
 import { useParams, useRouter } from "next/navigation"
+import { ArrowLeft, Loader2, MessageCircle } from "lucide-react"
+import type { INote } from "@apna/sdk"
+
 import { useApp } from "../../providers"
+import { useRealtimeThread } from "@/hooks/useRealtimeThread"
 import { Post } from "@/components/ui/post"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft } from "lucide-react"
-import type { INote, INoteReply } from "@apna/sdk"
+import { RailCard, SocialHeader, SocialLayout } from "@/components/ui/social-layout"
+import { getReplyParentId } from "@/lib/utils/social"
 import { noteToPostProps } from "@/lib/utils/post"
+import { cn } from "@/lib/utils"
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic"
 
-// Separate component for reply form to prevent parent re-renders
-const ReplyForm = ({ noteId, onSubmit }: { noteId: string; onSubmit: (content: string) => Promise<void> }) => {
-  const [content, setContent] = useState("")
+export default function ThreadPage() {
+  const router = useRouter()
+  const { id } = useParams()
+  const noteId = String(id)
+  const { replyToNote } = useApp()
+  const { rootNote, replies, loading, error, refresh } = useRealtimeThread(noteId)
+  const [replyingTo, setReplyingTo] = useState<string | null>(null)
 
-  const handleSubmit = async () => {
-    if (!content.trim()) return
-    await onSubmit(content)
-    setContent("")
+  const replyMap = useMemo(() => {
+    const map = new Map<string, INote[]>()
+    if (!rootNote) return map
+
+    replies.forEach((reply) => {
+      const parentId = getReplyParentId(reply as any) || rootNote.id
+      map.set(parentId, [...(map.get(parentId) || []), reply])
+    })
+    return map
+  }, [replies, rootNote])
+
+  const handleReplySubmit = async (targetId: string, content: string) => {
+    if (!content.trim()) {
+      setReplyingTo(null)
+      return
+    }
+    await replyToNote(targetId, content)
+    setReplyingTo(null)
+    void refresh()
   }
 
   return (
-    <div className="mt-4 mb-6 pl-6 relative space-y-2">
-      <div className="absolute left-2 top-0 bottom-0 w-[2px] bg-border/60" />
+    <SocialLayout rightRail={<ThreadRail replies={replies.length} />}>
+      <SocialHeader
+        title="Thread"
+        subtitle={rootNote ? `${replies.length} replies` : "conversation"}
+        action={
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        }
+      />
+
+      {loading && (
+        <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span className="text-sm">Loading thread...</span>
+        </div>
+      )}
+
+      {!loading && error && (
+        <div className="m-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-6 text-center">
+          <p className="text-sm font-medium text-destructive">Couldn&apos;t load thread</p>
+          <p className="mt-1 text-xs text-muted-foreground">{error}</p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={refresh}>
+            Try again
+          </Button>
+        </div>
+      )}
+
+      {!loading && !error && !rootNote && (
+        <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+          Thread not found.
+        </div>
+      )}
+
+      {rootNote && (
+        <div className="divide-y divide-border/80">
+          <ThreadPost note={rootNote} isTarget={rootNote.id === noteId} />
+          <ReplyToggle
+            active={replyingTo === rootNote.id}
+            onOpen={() => setReplyingTo(rootNote.id)}
+            onSubmit={(content) => handleReplySubmit(rootNote.id, content)}
+          />
+          <div className="bg-background px-4 py-3 text-sm font-medium">
+            Replies
+          </div>
+          {renderReplies({
+            parentId: rootNote.id,
+            replyMap,
+            targetId: noteId,
+            replyingTo,
+            setReplyingTo,
+            onSubmit: handleReplySubmit,
+          })}
+          {replies.length === 0 && (
+            <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+              No replies yet.
+            </div>
+          )}
+        </div>
+      )}
+    </SocialLayout>
+  )
+}
+
+function ThreadPost({ note, isTarget }: { note: INote; isTarget?: boolean }) {
+  return (
+    <div className={cn(isTarget && "bg-secondary/40")}>
+      <Post {...noteToPostProps(note)} hideParentNote />
+    </div>
+  )
+}
+
+function ReplyToggle({
+  active,
+  onOpen,
+  onSubmit,
+}: {
+  active: boolean
+  onOpen: () => void
+  onSubmit: (content: string) => Promise<void>
+}) {
+  if (active) return <ReplyForm onSubmit={onSubmit} />
+
+  return (
+    <div className="bg-background px-4 py-3">
+      <Button variant="ghost" size="sm" onClick={onOpen}>
+        <MessageCircle className="mr-2 h-4 w-4" />
+        Reply
+      </Button>
+    </div>
+  )
+}
+
+function ReplyForm({
+  onSubmit,
+}: {
+  onSubmit: (content: string) => Promise<void>
+}) {
+  const [content, setContent] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!content.trim()) return
+    setSubmitting(true)
+    try {
+      await onSubmit(content)
+      setContent("")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2 bg-background px-4 py-3">
       <Textarea
         placeholder="Write your reply..."
         value={content}
-        onChange={(e) => setContent(e.target.value)}
-        className="min-h-[100px]"
+        onChange={(event) => setContent(event.target.value)}
+        className="min-h-[96px]"
       />
       <div className="flex justify-end gap-2">
-        <Button variant="ghost" onClick={() => onSubmit("")}>Cancel</Button>
-        <Button onClick={handleSubmit}>Reply</Button>
+        <Button variant="outline" onClick={() => onSubmit("")}>
+          Cancel
+        </Button>
+        <Button onClick={handleSubmit} disabled={!content.trim() || submitting}>
+          {submitting ? "Replying..." : "Reply"}
+        </Button>
       </div>
     </div>
   )
 }
 
-export default function ThreadPage() {
-  const router = useRouter()
-  const { id } = useParams()
-  const { replyToNote, fetchNoteAndReplies } = useApp()
-  const [mainNote, setMainNote] = useState<INote | null>(null)
-  const [replies, setReplies] = useState<INoteReply[]>([])
-  const [loading, setLoading] = useState(true)
-  const [replyingTo, setReplyingTo] = useState<string | null>(null)
+function renderReplies({
+  parentId,
+  replyMap,
+  targetId,
+  replyingTo,
+  setReplyingTo,
+  onSubmit,
+  level = 0,
+}: {
+  parentId: string
+  replyMap: Map<string, INote[]>
+  targetId: string
+  replyingTo: string | null
+  setReplyingTo: (id: string | null) => void
+  onSubmit: (noteId: string, content: string) => Promise<void>
+  level?: number
+}): React.ReactNode {
+  const children = replyMap.get(parentId) || []
+  return children.map((reply) => (
+    <div key={reply.id} className={cn(level > 0 && "border-l border-border/80 pl-4")}>
+      <ThreadPost note={reply} isTarget={reply.id === targetId} />
+      <ReplyToggle
+        active={replyingTo === reply.id}
+        onOpen={() => setReplyingTo(reply.id)}
+        onSubmit={(content) => onSubmit(reply.id, content)}
+      />
+      {renderReplies({
+        parentId: reply.id,
+        replyMap,
+        targetId,
+        replyingTo,
+        setReplyingTo,
+        onSubmit,
+        level: level + 1,
+      })}
+    </div>
+  ))
+}
 
-  useEffect(() => {
-    const fetchNote = async () => {
-      try {
-        // First fetch the current note
-        const result = await fetchNoteAndReplies(id as string)
-        console.log('Fetched note and replies:', result)
-
-        // Check if this is a reply and has a root note
-        const rootNoteId = (result?.note?.tags as string[][])?.find(
-          tag => tag[0] === "e" && tag[3] === "root"
-        )?.[1]
-
-        // If this is a reply, fetch the thread from root
-        if (rootNoteId && rootNoteId !== id) {
-          const rootResult = await fetchNoteAndReplies(rootNoteId)
-          if (rootResult?.note) {
-            setMainNote(rootResult.note)
-            if (Array.isArray(rootResult?.replyNotes)) {
-              setReplies(rootResult.replyNotes)
-            }
-          }
-        } else {
-          // Not a reply or is the root note itself
-          if (result?.note) {
-            setMainNote(result.note)
-          }
-          if (Array.isArray(result?.replyNotes)) {
-            setReplies(result.replyNotes)
-          } else {
-            console.error('Unexpected replies format:', result?.replyNotes)
-            setReplies([])
-          }
-        }
-      } catch (error) {
-        console.error("Failed to fetch note:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchNote()
-  }, [id, fetchNoteAndReplies])
-
-  const handleReplySubmit = async (noteId: string, content: string) => {
-    if (!content) {
-      setReplyingTo(null)
-      return
-    }
-
-    try {
-      await replyToNote(noteId, content)
-      // Fetch updated replies
-      const result = await fetchNoteAndReplies(id as string)
-      if (Array.isArray(result?.replyNotes)) {
-        setReplies(result.replyNotes)
-      }
-      // Clear replyingTo after successful reply
-      setReplyingTo(null)
-    } catch (error) {
-      console.error("Failed to submit reply:", error)
-    }
-  }
-
-  const NotePost = ({ note, level = 0, isTarget = false }: { note: INote | INoteReply; level?: number; isTarget?: boolean }) => {
-    const noteRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-      if (isTarget && noteRef.current) {
-        setTimeout(() => {
-          noteRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 100);
-      }
-    }, [isTarget]);
-
-    return (
-      <div ref={noteRef}>
-        <Post
-          {...noteToPostProps(note)}
-          hideParentNote={true}
-          onHashtagClick={(hashtag) => {
-            // Handle hashtag click if needed
-          }}
-        />
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-screen-md px-4 py-4">
-          <div className="flex items-center gap-4 mb-4">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="text-xl font-semibold">Loading Thread...</h1>
-          </div>
-          <div className="flex justify-center py-8">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!mainNote) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-screen-md px-4 py-4">
-          <div className="flex items-center gap-4 mb-4">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="text-xl font-semibold">Thread not found</h1>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Helper function to organize replies hierarchically
-  const organizeReplies = () => {
-    const replyMap = new Map<string, INoteReply[]>();
-    
-    // Group replies by their direct parent
-    replies.forEach(reply => {
-      const tags = reply.tags as string[][];
-      let parentId = mainNote.id; // Default to main note
-
-      // Find all "e" tags marked as "reply"
-      const replyTags = tags?.filter(tag => tag[0] === "e" && tag[3] === "reply");
-      if (replyTags?.length > 0) {
-        // Use the last reply tag as the parent
-        parentId = replyTags[replyTags.length - 1][1];
-      } else {
-        // If no reply tags, check for root tag
-        const rootTag = tags?.find(tag => tag[0] === "e" && tag[3] === "root");
-        if (rootTag) {
-          parentId = rootTag[1];
-        }
-      }
-      
-      if (!replyMap.has(parentId)) {
-        replyMap.set(parentId, []);
-      }
-      replyMap.get(parentId)?.push(reply);
-    });
-
-    // Recursive function to render replies with proper indentation
-    const renderReplies = (parentId: string, level: number = 0) => {
-      const children = replyMap.get(parentId) || [];
-      return children.map((reply) => (
-        <div key={reply.id} className={`${level > 0 ? 'pl-6' : ''} relative`}>
-          {level > 0 && (
-            <div className="absolute left-2 top-0 bottom-0 w-[2px] bg-border/60" />
-          )}
-          <NotePost note={reply} level={level} isTarget={reply.id === id} />
-          {renderReplies(reply.id, level + 1)}
-        </div>
-      ));
-    };
-
-    return renderReplies(mainNote.id);
-  };
-
+function ThreadRail({ replies }: { replies: number }) {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-screen-md px-4 py-4">
-        <div className="sticky top-0 z-20 mb-4 flex items-center gap-4 border-b border-border/80 bg-background/90 py-3 backdrop-blur">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className="text-xl font-semibold">Thread</h1>
+    <div className="space-y-4">
+      <RailCard title="Conversation">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Replies</span>
+          <span className="font-mono text-[12px]">{replies}</span>
         </div>
-
-        {/* Main Note */}
-        <NotePost note={mainNote} isTarget={mainNote.id === id} />
-        {replyingTo === mainNote.id ? (
-          <ReplyForm
-            noteId={mainNote.id}
-            onSubmit={(content) => handleReplySubmit(mainNote.id, content)}
-          />
-        ) : (
-          <button
-            className="mt-2 text-primary hover:text-primary/90 text-sm font-medium"
-            onClick={() => setReplyingTo(mainNote.id)}
-          >
-            Reply to this note
-          </button>
-        )}
-
-        {/* Replies */}
-        <div className="space-y-4 mt-6">
-          <h2 className="text-lg font-semibold">Replies ({replies.length})</h2>
-          {replies.length > 0 ? (
-            <div className="space-y-6">
-              {organizeReplies()}
-            </div>
-          ) : (
-            <p className="text-muted-foreground">No replies yet</p>
-          )}
-        </div>
-      </div>
+      </RailCard>
     </div>
   )
 }

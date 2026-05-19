@@ -1,433 +1,473 @@
 "use client"
 
+import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
+import { ChevronLeft, Loader2 } from "lucide-react"
+import type { ApnaSocialDomain, INote, UserMetadata } from "@apna/sdk"
+
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft } from "lucide-react"
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
-import { NpubDisplay } from "@/components/atoms/NpubDisplay"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Post } from "@/components/ui/post"
-import { UserProfileCard } from "@/components/ui/user-profile-card"
 import { Fab } from "@/components/ui/fab"
-import { useEffect, useState, useCallback } from "react"
+import { Post } from "@/components/ui/post"
+import { RailCard, SocialHeader, SocialLayout } from "@/components/ui/social-layout"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import { NpubDisplay } from "@/components/atoms/NpubDisplay"
+import { UserProfileCard } from "@/components/ui/user-profile-card"
+import { INITIAL_FETCH_SIZE, LOAD_MORE_SIZE, userNotesFeedDB } from "@/lib/userNotesFeedDB"
+import { isNote, mergeById } from "@/lib/utils/social"
 import { noteToPostProps } from "@/lib/utils/post"
-import { userNotesFeedDB, INITIAL_FETCH_SIZE, LOAD_MORE_SIZE } from "@/lib/userNotesFeedDB"
-import { DynamicEditProfile } from "@/components/ui/dynamic-edit-profile"
-import type { INote, ApnaSocialDomain } from "@apna/sdk"
 
 export interface UserProfile {
-  metadata: {
-    name?: string
-    about?: string
-    picture?: string
-  }
+  metadata: UserMetadata
   followers: string[]
   following: string[]
   pubkey: string
 }
 
 interface ProfileTemplateProps {
-  // Core data
   userProfile: UserProfile
   isCurrentUser: boolean
-  
-  // UI control flags
+  isFollowing?: boolean
   showBackButton?: boolean
   showEditProfile?: boolean
   showFollowButton?: boolean
   showFab?: boolean
-  
-  // Edit profile related props
   isEditing?: boolean
-  editForm?: {
-    name: string
-    about: string
-  }
-  onEditStart?: (data: { name: string; about: string }) => void
-  onEditSave?: (data: { name: string; about: string }) => void
+  editForm?: UserMetadata
+  onEditStart?: (data: UserMetadata) => void
+  onEditSave?: (data: UserMetadata) => void
   onEditCancel?: () => void
-  
-  // Action handlers
   onFollowToggle?: () => Promise<void>
-  onPublishNote?: (content: string) => Promise<void>
-  
-  // Data fetching — accepts the real social domain (or undefined during load)
+  onPublishNote?: (content: string) => Promise<unknown>
   social?: ApnaSocialDomain
-  userMetadata?: Record<string, any>
 }
+
+const profileFields: Array<{
+  key: keyof UserMetadata
+  label: string
+  placeholder: string
+  multiline?: boolean
+}> = [
+  { key: "name", label: "Name", placeholder: "short handle" },
+  { key: "display_name", label: "Display name", placeholder: "display name" },
+  { key: "about", label: "About", placeholder: "bio", multiline: true },
+  { key: "picture", label: "Picture", placeholder: "avatar URL" },
+  { key: "banner", label: "Banner", placeholder: "banner URL" },
+  { key: "website", label: "Website", placeholder: "https://..." },
+  { key: "nip05", label: "NIP-05", placeholder: "name@example.com" },
+  { key: "lud16", label: "Lightning", placeholder: "name@example.com" },
+]
 
 export function ProfileTemplate({
   userProfile,
   isCurrentUser,
+  isFollowing = false,
   showBackButton = false,
   showEditProfile = false,
   showFollowButton = false,
   showFab = false,
   isEditing = false,
-  editForm = { name: '', about: '' },
+  editForm = {},
   onEditStart,
   onEditSave,
   onEditCancel,
   onFollowToggle,
   onPublishNote,
   social,
-  userMetadata = {}
 }: ProfileTemplateProps) {
   const router = useRouter()
   const [userNotes, setUserNotes] = useState<INote[]>([])
   const [loadingNotes, setLoadingNotes] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
-  
-  // Function to fetch notes from cache or API
-  const fetchNotes = useCallback(async (pubkey: string, before?: number, currentLength: number = 0) => {
+
+  const metadata = userProfile.metadata || {}
+  const displayName = stringField(metadata.display_name) || stringField(metadata.name) || "Unknown"
+  const handle = stringField(metadata.name) || "nostr user"
+  const banner = imageSrc(metadata.banner)
+
+  const fetchNotes = useCallback(async (before?: number, currentLength = 0) => {
     try {
-      // First try to get notes from cache
       const cachedNotes = await userNotesFeedDB.getNotes(
-        pubkey,
+        userProfile.pubkey,
         before ? LOAD_MORE_SIZE : INITIAL_FETCH_SIZE,
         before
       )
-      
-      // Convert StoredNotes to INote format
-      const convertToINote = (note: any): INote => ({
-        ...note,
-        kind: 1, // Notes are kind 1
-        sig: note.sig || '',
-        tags: note.tags || [],
-      });
-      
-      // If we have cached notes, use them immediately
-      if (cachedNotes.length > 0) {
-        const convertedNotes = cachedNotes.map(convertToINote);
-        
-        if (before) {
-          // Append to existing notes if loading more
-          setUserNotes(prev => [...prev, ...convertedNotes])
-        } else {
-          // Replace notes if initial load
-          setUserNotes(convertedNotes)
-        }
-        
-        // Check if we might have more notes to load
+      const convertedCached = cachedNotes.map(toNote)
+
+      if (convertedCached.length > 0) {
+        setUserNotes((current) =>
+          before ? mergeById(current, convertedCached) : convertedCached
+        )
         setHasMore(cachedNotes.length >= (before ? LOAD_MORE_SIZE : INITIAL_FETCH_SIZE))
       }
-      
-      // Get the latest timestamp we have in cache (only used for initial load)
-      const latestTimestamp = before ? undefined : await userNotesFeedDB.getLatestTimestamp(pubkey)
-      
-      // Fetch fresh notes from API
-      // When loading more (before is defined), we don't need since parameter
-      const since = before ? undefined : (latestTimestamp ? latestTimestamp + 1 : undefined)
-      const until = before || undefined
-      const limit = before ? LOAD_MORE_SIZE : INITIAL_FETCH_SIZE
-      
+
       if (!social) {
-        if (cachedNotes.length === 0) {
-          setUserNotes([])
-          setHasMore(false)
-        }
+        if (convertedCached.length === 0) setHasMore(false)
         return
       }
 
-      const freshEvents = await social.v1.userFeed(pubkey, 'NOTES_FEED', { since, until, limit })
-      const freshNotes = freshEvents.filter((event: any): event is INote => event.kind === 1)
-      
-      // If we got fresh notes, add them to cache and update state
+      const latestTimestamp = before
+        ? undefined
+        : await userNotesFeedDB.getLatestTimestamp(userProfile.pubkey)
+      const freshEvents = await social.v1.userFeed(userProfile.pubkey, "NOTES_FEED", {
+        since: before ? undefined : latestTimestamp ? latestTimestamp + 1 : undefined,
+        until: before,
+        limit: before ? LOAD_MORE_SIZE : INITIAL_FETCH_SIZE,
+      })
+      const freshNotes = freshEvents.filter(isNote)
+
       if (freshNotes.length > 0) {
-        // Add to cache
-        await userNotesFeedDB.addNotes(pubkey, freshNotes)
-        
-        // Get updated notes from cache to ensure correct order
+        await userNotesFeedDB.addNotes(userProfile.pubkey, freshNotes)
         const updatedNotes = await userNotesFeedDB.getNotes(
-          pubkey,
+          userProfile.pubkey,
           before ? currentLength + LOAD_MORE_SIZE : INITIAL_FETCH_SIZE
         )
-        
-        setUserNotes(updatedNotes.map(convertToINote))
-        setHasMore(freshNotes.length >= limit)
-      } else if (cachedNotes.length === 0) {
-        // If no cached notes and no fresh notes, we have no notes
+        setUserNotes(updatedNotes.map(toNote))
+        setHasMore(freshNotes.length >= (before ? LOAD_MORE_SIZE : INITIAL_FETCH_SIZE))
+      } else if (convertedCached.length === 0) {
         setUserNotes([])
         setHasMore(false)
       }
     } catch (error) {
       console.error("Failed to fetch user notes:", error)
     }
-  }, [social])
-  
-  // Load more notes
+  }, [social, userProfile.pubkey])
+
+  useEffect(() => {
+    setLoadingNotes(true)
+    void fetchNotes().finally(() => setLoadingNotes(false))
+  }, [fetchNotes])
+
+  useEffect(() => {
+    if (!social) return
+    const unsubscribe = social.v1.subscribeUserFeed(
+      userProfile.pubkey,
+      "NOTES_FEED",
+      { since: Math.floor(Date.now() / 1000), limit: 100 },
+      (event) => {
+        if (!isNote(event)) return
+        setUserNotes((current) => mergeById(current, [event]))
+        void userNotesFeedDB.addNotes(userProfile.pubkey, [event])
+      }
+    )
+    return unsubscribe
+  }, [social, userProfile.pubkey])
+
   const loadMoreNotes = async () => {
-    if (!userProfile || loadingMore || !hasMore) return
-    
+    if (loadingMore || !hasMore) return
+    const oldestNote = userNotes[userNotes.length - 1]
+    if (!oldestNote) return
+
     setLoadingMore(true)
     try {
-      // Get the oldest note timestamp to use as 'before' parameter
-      const oldestNote = userNotes[userNotes.length - 1]
-      if (oldestNote) {
-        await fetchNotes(userProfile.pubkey, oldestNote.created_at, userNotes.length)
-      }
-    } catch (error) {
-      console.error("Failed to load more notes:", error)
+      await fetchNotes(oldestNote.created_at, userNotes.length)
     } finally {
       setLoadingMore(false)
     }
   }
 
-  useEffect(() => {
-    if (userProfile) {
-      const fetchData = async () => {
-        try {
-          // Fetch user's notes using our caching function
-          await fetchNotes(userProfile.pubkey)
-        } catch (error) {
-          console.error("Failed to fetch user notes:", error)
-        } finally {
-          setLoadingNotes(false)
-        }
-      }
-
-      fetchData()
-    }
-  }, [userProfile, fetchNotes])
-
-  if (!userProfile) {
-    return (
-      <div className="min-h-screen bg-background pb-24 md:pb-0">
-        <div className="mx-auto max-w-screen-md px-4 py-4">
-          <div className="text-center py-8 text-muted-foreground">
-            Loading profile...
-          </div>
-        </div>
-      </div>
-    )
+  const updateField = (key: keyof UserMetadata, value: string) => {
+    onEditStart?.({
+      ...editForm,
+      [key]: value,
+    })
   }
 
   return (
     <>
-      <div className="min-h-screen bg-background">
-        <div className="max-w-screen-md mx-auto py-4 px-4">
-          {/* Back Button - Only shown on user/[pubkey] page */}
-          {showBackButton && (
-            <Button
-              variant="ghost"
-              className="mb-4"
-              onClick={() => router.back()}
-            >
-              <ChevronLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
+      <SocialLayout
+        rightRail={
+          <ProfileRail
+            notes={userNotes.length}
+            followers={userProfile.followers.length}
+            following={userProfile.following.length}
+          />
+        }
+      >
+        <SocialHeader
+          title={displayName}
+          subtitle={isCurrentUser ? "your profile" : "profile"}
+          action={
+            showBackButton ? (
+              <Button variant="ghost" size="icon" onClick={() => router.back()}>
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+            ) : null
+          }
+        />
+
+        <section className="border-b border-border/80 bg-card">
+          {banner && (
+            <div className="relative h-32 overflow-hidden border-b border-border/80 bg-secondary">
+              <Image
+                src={banner}
+                alt=""
+                fill
+                sizes="(max-width: 768px) 100vw, 680px"
+                className="object-cover"
+              />
+            </div>
           )}
 
-          {/* Profile Header */}
-          <div className="mb-6 rounded-lg border border-border/80 bg-card p-4">
+          <div className="p-4">
             {isEditing ? (
               <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <Avatar className="w-20 h-20 text-2xl">
-                    <AvatarImage src={userProfile.metadata.picture} alt="Profile" />
-                    <AvatarFallback className="text-2xl font-bold">
-                      {editForm.name?.[0] || userProfile.metadata.name?.[0] || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      value={editForm.name}
-                      onChange={(e) => {
-                        if (onEditStart) {
-                          onEditStart({
-                            ...editForm,
-                            name: e.target.value
-                          });
-                        }
-                      }}
-                      placeholder="Your name"
-                      className="w-full px-3 py-2 border rounded-md bg-background"
-                    />
-                    <NpubDisplay pubkey={userProfile.pubkey} className="text-sm text-muted-foreground mt-1" />
-                  </div>
-                </div>
-                
-                <div>
-                  <textarea
-                    value={editForm.about}
-                    onChange={(e) => {
-                      if (onEditStart) {
-                        onEditStart({
-                          ...editForm,
-                          about: e.target.value
-                        });
-                      }
-                    }}
-                    placeholder="About you"
-                    className="w-full px-3 py-2 border rounded-md bg-background resize-none h-24"
-                  />
+                <ProfileIdentity
+                  name={stringField(editForm.display_name) || stringField(editForm.name) || displayName}
+                  picture={stringField(editForm.picture) || stringField(metadata.picture)}
+                  pubkey={userProfile.pubkey}
+                />
+
+                <div className="grid gap-3">
+                  {profileFields.map((field) => (
+                    <label key={String(field.key)} className="grid gap-1 text-sm">
+                      <span className="font-medium">{field.label}</span>
+                      {field.multiline ? (
+                        <Textarea
+                          value={stringField(editForm[field.key])}
+                          onChange={(event) => updateField(field.key, event.target.value)}
+                          placeholder={field.placeholder}
+                          className="min-h-[96px]"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={stringField(editForm[field.key])}
+                          onChange={(event) => updateField(field.key, event.target.value)}
+                          placeholder={field.placeholder}
+                          className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
+                        />
+                      )}
+                    </label>
+                  ))}
                 </div>
 
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      if (onEditSave) {
-                        onEditSave(editForm);
-                      }
-                    }}
-                    className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (onEditCancel) {
-                        onEditCancel();
-                      }
-                    }}
-                    className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90"
-                  >
-                    Cancel
-                  </button>
+                  <Button onClick={() => onEditSave?.(editForm)}>Save</Button>
+                  <Button variant="outline" onClick={onEditCancel}>Cancel</Button>
                 </div>
               </div>
             ) : (
-              <>
-                <div className="flex items-center gap-4">
-                  <Avatar className="w-20 h-20 text-2xl">
-                    <AvatarImage src={userProfile.metadata.picture} alt="Profile" />
-                    <AvatarFallback className="text-2xl font-bold">
-                      {userProfile.metadata.name?.[0] || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h1 className="text-2xl font-bold">{userProfile.metadata.name || "Unknown"}</h1>
-                    </div>
-                    <NpubDisplay pubkey={userProfile.pubkey} className="text-sm text-muted-foreground" />
-                    
-                    {/* Follow/Unfollow Button - Only shown on user/[pubkey] page */}
-                    {showFollowButton && !isCurrentUser && (
+              <div className="space-y-4">
+                <div className="flex items-start gap-4">
+                  <ProfileIdentity
+                    name={displayName}
+                    picture={stringField(metadata.picture)}
+                    pubkey={userProfile.pubkey}
+                  />
+                  <div className="ml-auto flex shrink-0 gap-2">
+                    {showEditProfile && isCurrentUser && (
                       <Button
-                        className="mt-4"
-                        variant={isCurrentUser ? "outline" : "default"}
-                        onClick={onFollowToggle}
+                        variant="outline"
+                        onClick={() => onEditStart?.({ ...metadata })}
                       >
-                        {isCurrentUser ? "Unfollow" : "Follow"}
+                        Edit
+                      </Button>
+                    )}
+                    {showFollowButton && !isCurrentUser && (
+                      <Button onClick={onFollowToggle} variant={isFollowing ? "outline" : "default"}>
+                        {isFollowing ? "Unfollow" : "Follow"}
                       </Button>
                     )}
                   </div>
                 </div>
-                
-                {/* Edit Profile Button - Only shown on profile page */}
-                {showEditProfile && isCurrentUser && (
-                  <DynamicEditProfile
-                    name={userProfile.metadata.name || ''}
-                    about={userProfile.metadata.about || ''}
-                    onEdit={({ name, about }: { name: string; about: string }) => {
-                      if (onEditStart) {
-                        onEditStart({ name, about });
-                      }
-                    }}
-                    className="mt-4 ml-24 px-3 py-1 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90"
-                  />
+
+                {stringField(metadata.about) && (
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    {stringField(metadata.about)}
+                  </p>
                 )}
-                
-                {/* Bio */}
-                {userProfile.metadata.about && (
-                  <p className="mt-4 text-muted-foreground">{userProfile.metadata.about}</p>
+
+                <ProfileMetadata metadata={metadata} />
+
+                <div className="grid grid-cols-3 rounded-lg border border-border/80 text-center text-sm">
+                  <Stat label="Notes" value={userNotes.length} />
+                  <Stat label="Followers" value={userProfile.followers.length} />
+                  <Stat label="Following" value={userProfile.following.length} />
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <Tabs defaultValue="notes">
+          <TabsList className="w-full rounded-none border-b border-border/80 bg-background">
+            <TabsTrigger value="notes" className="flex-1">Notes</TabsTrigger>
+            <TabsTrigger value="followers" className="flex-1">Followers</TabsTrigger>
+            <TabsTrigger value="following" className="flex-1">Following</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="notes" className="m-0">
+            {loadingNotes ? (
+              <div className="flex items-center justify-center gap-2 py-10 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="text-sm">Loading notes...</span>
+              </div>
+            ) : userNotes.length > 0 ? (
+              <>
+                <div className="divide-y divide-border/80">
+                  {userNotes.map((note) => (
+                    <Post key={note.id} {...noteToPostProps(note)} />
+                  ))}
+                </div>
+                {hasMore && (
+                  <div className="flex justify-center px-4 py-6">
+                    <Button variant="outline" onClick={loadMoreNotes} disabled={loadingMore}>
+                      {loadingMore ? "Loading..." : "Load more"}
+                    </Button>
+                  </div>
                 )}
               </>
+            ) : (
+              <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                No notes yet.
+              </div>
             )}
+          </TabsContent>
 
-            {/* Stats */}
-            <div className="flex gap-6 mt-4">
-              <div>
-                <span className="font-bold">{userNotes.length}</span>
-                <span className="text-muted-foreground ml-1">Notes</span>
+          <TabsContent value="followers" className="m-0 divide-y divide-border/80">
+            {userProfile.followers.length > 0 ? (
+              userProfile.followers.map((pubkey) => (
+                <div key={pubkey} className="px-4 py-3">
+                  <UserProfileCard pubkey={pubkey} />
+                </div>
+              ))
+            ) : (
+              <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                No followers yet.
               </div>
-              <div>
-                <span className="font-bold">{userProfile.followers.length}</span>
-                <span className="text-muted-foreground ml-1">Followers</span>
+            )}
+          </TabsContent>
+
+          <TabsContent value="following" className="m-0 divide-y divide-border/80">
+            {userProfile.following.length > 0 ? (
+              userProfile.following.map((pubkey) => (
+                <div key={pubkey} className="px-4 py-3">
+                  <UserProfileCard pubkey={pubkey} />
+                </div>
+              ))
+            ) : (
+              <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                Not following anyone yet.
               </div>
-              <div>
-                <span className="font-bold">{userProfile.following.length}</span>
-                <span className="text-muted-foreground ml-1">Following</span>
-              </div>
-            </div>
-          </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </SocialLayout>
 
-          {/* Tabs */}
-          <Tabs defaultValue="notes">
-            <TabsList className="w-full">
-              <TabsTrigger value="notes" className="flex-1">Notes</TabsTrigger>
-              <TabsTrigger value="followers" className="flex-1">Followers</TabsTrigger>
-              <TabsTrigger value="following" className="flex-1">Following</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="notes" className="mt-4 space-y-4">
-              {loadingNotes ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Loading notes...
-                </div>
-              ) : userNotes.length > 0 ? (
-                <>
-                  <div className="space-y-4">
-                    {userNotes.map((note) => (
-                      <Post
-                        key={note.id}
-                        {...noteToPostProps(note)}
-                      />
-                    ))}
-                  </div>
-                  
-                  {hasMore && (
-                    <div className="flex justify-center mt-6">
-                      <Button
-                        variant="outline"
-                        onClick={loadMoreNotes}
-                        disabled={loadingMore}
-                      >
-                        {loadingMore ? 'Loading...' : 'Load More'}
-                      </Button>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  No notes yet
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="followers" className="mt-4 space-y-4">
-              {userProfile.followers.length > 0 ? (
-                userProfile.followers.map((pubkey) => (
-                  <UserProfileCard key={pubkey} pubkey={pubkey} />
-                ))
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  No followers yet
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="following" className="mt-4 space-y-4">
-              {userProfile.following.length > 0 ? (
-                userProfile.following.map((pubkey) => (
-                  <UserProfileCard key={pubkey} pubkey={pubkey} />
-                ))
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  Not following anyone yet
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
-        
-        {/* Fab Button - Only shown on profile page */}
-        {showFab && onPublishNote && (
-          <Fab onPublish={onPublishNote} />
-        )}
-      </div>
+      {showFab && onPublishNote && <Fab onPublish={onPublishNote} />}
     </>
   )
+}
+
+function ProfileIdentity({
+  name,
+  picture,
+  pubkey,
+}: {
+  name: string
+  picture?: string
+  pubkey: string
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-4">
+      <Avatar className="h-20 w-20 text-2xl">
+        <AvatarImage src={picture} alt="" />
+        <AvatarFallback className="text-2xl font-bold">
+          {name.charAt(0).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <h1 className="truncate text-2xl font-bold">{name}</h1>
+        <NpubDisplay pubkey={pubkey} className="text-sm text-muted-foreground" />
+      </div>
+    </div>
+  )
+}
+
+function ProfileMetadata({ metadata }: { metadata: UserMetadata }) {
+  const fields = [
+    stringField(metadata.website),
+    stringField(metadata.nip05),
+    stringField(metadata.lud16 || metadata.lud06),
+  ].filter(Boolean)
+
+  if (fields.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {fields.map((field) => (
+        <span
+          key={field}
+          className="rounded-md bg-secondary px-2 py-1 font-mono text-[11px] text-secondary-foreground"
+        >
+          {field}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="border-r border-border/80 px-2 py-3 last:border-r-0">
+      <p className="font-semibold">{value}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </div>
+  )
+}
+
+function ProfileRail({
+  notes,
+  followers,
+  following,
+}: {
+  notes: number
+  followers: number
+  following: number
+}) {
+  return (
+    <div className="space-y-4">
+      <RailCard title="Profile">
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Notes</span>
+            <span className="font-mono text-[12px]">{notes}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Followers</span>
+            <span className="font-mono text-[12px]">{followers}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Following</span>
+            <span className="font-mono text-[12px]">{following}</span>
+          </div>
+        </div>
+      </RailCard>
+    </div>
+  )
+}
+
+function toNote(note: any): INote {
+  return {
+    ...note,
+    kind: 1,
+    sig: note.sig || "",
+    tags: note.tags || [],
+  }
+}
+
+function stringField(value: unknown): string {
+  return typeof value === "string" ? value : ""
+}
+
+function imageSrc(value: unknown): string {
+  const src = stringField(value)
+  if (src.startsWith("https://") || src.startsWith("http://") || src.startsWith("/")) {
+    return src
+  }
+  return ""
 }

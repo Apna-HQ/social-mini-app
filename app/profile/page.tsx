@@ -4,17 +4,14 @@ import { useApp } from "../providers"
 import { useApna } from "@/components/providers/ApnaProvider"
 import { useState, useEffect } from "react"
 import { ProfileTemplate, UserProfile } from "@/components/templates/ProfileTemplate"
+import type { UserMetadata } from "@apna/sdk"
 
 export default function ProfilePage() {
   const { profile: appProfile, updateProfileMetadata, publishNote } = useApp()
   const { social } = useApna()
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
-  const [userMetadata, setUserMetadata] = useState<Record<string, any>>({})
   const [isEditing, setIsEditing] = useState(false)
-  const [editForm, setEditForm] = useState({
-    name: '',
-    about: ''
-  })
+  const [editForm, setEditForm] = useState<UserMetadata>({})
 
   useEffect(() => {
     if (appProfile && social) {
@@ -22,8 +19,6 @@ export default function ProfilePage() {
         try {
           await fetchFreshProfile()
 
-          // Fetch metadata for followers and following
-          await fetchMetadata()
         } catch (error) {
           console.error("Failed to fetch user data:", error)
         }
@@ -37,44 +32,40 @@ export default function ProfilePage() {
             pubkey: appProfile.pubkey // Ensure pubkey is included
           }
           setUserProfile(profileWithPubkey)
+          setEditForm(profileWithPubkey.metadata || {})
         } catch (error) {
           console.error("Failed to fetch fresh profile:", error)
         }
-      }
-
-      const fetchMetadata = async () => {
-        const metadata: Record<string, any> = {}
-        const allUsers = Array.from(new Set([...appProfile.followers, ...appProfile.following]))
-
-        await Promise.all(
-          allUsers.map(async (pubkey) => {
-            try {
-              const userMetadata = await social!.v1.userMetadata(pubkey)
-              metadata[pubkey] = userMetadata
-            } catch (error) {
-              console.error(`Failed to fetch metadata for ${pubkey}:`, error)
-            }
-          })
-        )
-
-        setUserMetadata(metadata)
       }
 
       fetchData()
     }
   }, [appProfile, social])
 
-  const handleEditStart = (data: { name: string; about: string }) => {
+  useEffect(() => {
+    if (!appProfile || !social) return
+    const unsubscribe = social.v1.subscribeProfile(appProfile.pubkey, (profile) => {
+      setUserProfile({
+        metadata: profile.metadata,
+        pubkey: profile.pubkey,
+        followers: profile.followers || [],
+        following: profile.following || [],
+      })
+    })
+    return unsubscribe
+  }, [appProfile, social])
+
+  const handleEditStart = (data: UserMetadata) => {
     setEditForm(data)
     setIsEditing(true)
   }
 
-  const handleEditSave = async (data: { name: string; about: string }) => {
+  const handleEditSave = async (data: UserMetadata) => {
     try {
-      await updateProfileMetadata({
-        name: data.name,
-        about: data.about
-      })
+      await updateProfileMetadata(data)
+      setUserProfile((current) =>
+        current ? { ...current, metadata: data } : current
+      )
       setIsEditing(false)
     } catch (error) {
       console.error("Failed to update profile:", error)
@@ -83,10 +74,7 @@ export default function ProfilePage() {
 
   const handleEditCancel = () => {
     setIsEditing(false)
-    setEditForm({
-      name: userProfile?.metadata.name || '',
-      about: userProfile?.metadata.about || ''
-    })
+    setEditForm(userProfile?.metadata || {})
   }
 
   if (!userProfile) {
@@ -114,7 +102,6 @@ export default function ProfilePage() {
       onEditCancel={handleEditCancel}
       onPublishNote={publishNote}
       social={social}
-      userMetadata={userMetadata}
     />
   )
 }

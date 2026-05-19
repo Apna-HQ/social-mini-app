@@ -1,17 +1,16 @@
 "use client"
 import { createContext, useCallback, useContext, useEffect, useState } from "react"
 import { useApna } from "@/components/providers/ApnaProvider";
-import type { BaseNote } from "@/lib/feedDB"; // Import BaseNote
+import type {
+  DirectMessage,
+  Note,
+  NoteAndReplies,
+  NostrEvent,
+  UserMetadata,
+} from "@apna/sdk";
 
 interface Profile {
-  metadata: {
-    name?: string
-    about?: string
-    picture?: string
-    nip05?: string
-    banner?: string
-    [key: string]: any
-  }
+  metadata: UserMetadata
   stats: {
     posts: number
   }
@@ -22,12 +21,16 @@ interface Profile {
 
 interface AppContextType {
   profile: Profile | null; // Keep profile and other non-feed related items
-  publishNote: (content: string) => Promise<void>
-  likeNote: (id: string) => Promise<void>
-  repostNote: (id: string) => Promise<void>
-  replyToNote: (id: string, content: string) => Promise<void>
-  fetchNoteAndReplies: (id: string) => Promise<any>
-  updateProfileMetadata: (metadata: { name?: string, about?: string }) => Promise<void>
+  refreshProfile: () => Promise<void>
+  publishNote: (content: string) => Promise<Note | void>
+  reactToNote: (id: string, content?: string) => Promise<NostrEvent | void>
+  likeNote: (id: string) => Promise<NostrEvent | void>
+  repostNote: (id: string) => Promise<NostrEvent | void>
+  quoteRepostNote: (id: string, content: string) => Promise<NostrEvent | void>
+  replyToNote: (id: string, content: string) => Promise<Note | void>
+  sendDirectMessage: (pubkey: string, content: string) => Promise<DirectMessage | void>
+  fetchNoteAndReplies: (id: string) => Promise<NoteAndReplies>
+  updateProfileMetadata: (metadata: UserMetadata) => Promise<void>
 // Removed saveScrollPosition and savedScrollAnchorId
   fetchUserProfile: (pubkey: string) => Promise<Profile | null>
 }
@@ -53,7 +56,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Removed fetchInitialFeed, refreshFeed, loadMore functions
   // Fetch initial profile info (Keep this part)
-  const fetchInitialProfile = async () => {
+  const fetchInitialProfile = useCallback(async () => {
     try {
       // identity.v1.me() returns UserProfile with pubkey (hex) directly
       const userProfile = await apna.identity!.v1.me();
@@ -72,18 +75,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Failed to fetch initial profile:", error);
     }
-  };
+  }, [apna]);
 
   // Fetch profile on mount
   useEffect(() => {
-    fetchInitialProfile();
-  }, [apna]); // Depend on apna context
+    void fetchInitialProfile();
+  }, [fetchInitialProfile]); // Depend on apna context
 
   const publishNote = async (content: string) => {
-    if (!content.trim()) return
+    if (!content.trim()) return undefined
     try {
       await ensureApnaInitialized()
-      const result = await apna.social!.v1.publishNote(content)
+      return await apna.social!.v1.publishNote(content)
     } catch (error) {
       console.error("Failed to publish note:", error)
       throw error
@@ -91,17 +94,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   const likeNote = async (id: string) => {
+    return reactToNote(id, "+")
+  }
+
+  const reactToNote = async (id: string, content: string = "+") => {
     if (!profile?.pubkey) {
       throw new Error('No active user profile')
     }
     
     try {
       await ensureApnaInitialized()
-      const result = await apna.social!.v1.like(id)
-      // Don't add reactions to feedDB or update notes state
-      // as reactions are not notes themselves but reaction events
+      return await apna.social!.v1.react(id, content)
     } catch (error) {
-      console.error("Failed to like note:", error)
+      console.error("Failed to react to note:", error)
       throw error
     }
   }
@@ -113,24 +118,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     
     try {
       await ensureApnaInitialized()
-      const result = await apna.social!.v1.repost(id)
-      if (result) {
-        // Map INoteRepost to BaseNote before adding to DB
-        const repostForDb: BaseNote = {
-          id: result.id,
-          content: result.content,
-          pubkey: result.pubkey,
-          created_at: result.created_at,
-          tags: result.tags as string[][], // Assert type compatibility
-          sig: result.sig,
-        };
-        // We still need feedDB instance here, ensure it's imported if not already
-        const { feedDB } = await import('@/lib/feedDB');
-        await feedDB.addNotes(profile.pubkey, [repostForDb])
-        // Removed setNotes call - feed state is managed by useFeed hook now
-      }
+      return await apna.social!.v1.repost(id)
     } catch (error) {
       console.error("Failed to repost note:", error)
+      throw error
+    }
+  }
+
+  const quoteRepostNote = async (id: string, content: string) => {
+    if (!profile?.pubkey) {
+      throw new Error('No active user profile')
+    }
+
+    try {
+      await ensureApnaInitialized()
+      return await apna.social!.v1.quoteRepost(id, content)
+    } catch (error) {
+      console.error("Failed to quote repost note:", error)
       throw error
     }
   }
@@ -142,29 +146,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     
     try {
       await ensureApnaInitialized()
-      const result = await apna.social!.v1.reply(id, content)
-      if (result) {
-        // Map INoteReply to BaseNote before adding to DB
-        const replyForDb: BaseNote = {
-          id: result.id,
-          content: result.content,
-          pubkey: result.pubkey,
-          created_at: result.created_at,
-          tags: result.tags as string[][], // Assert type compatibility
-          sig: result.sig,
-        };
-        // Ensure feedDB instance is imported if not already
-        const { feedDB } = await import('@/lib/feedDB');
-        await feedDB.addNotes(profile.pubkey, [replyForDb])
-        // Removed setNotes call - feed state is managed by useFeed hook now
-      }
+      return await apna.social!.v1.reply(id, content)
     } catch (error) {
       console.error("Failed to reply to note:", error)
       throw error
     }
   }
 
-  const updateProfileMetadata = async (metadata: { name?: string, about?: string }) => {
+  const sendDirectMessage = async (pubkey: string, content: string) => {
+    if (!profile?.pubkey) {
+      throw new Error('No active user profile')
+    }
+
+    try {
+      await ensureApnaInitialized()
+      return await apna.social!.v1.sendDirectMessage(pubkey, content)
+    } catch (error) {
+      console.error("Failed to send direct message:", error)
+      throw error
+    }
+  }
+
+  const updateProfileMetadata = async (metadata: UserMetadata) => {
     try {
       await ensureApnaInitialized()
       const result = await apna.identity!.v1.updateProfile(metadata)
@@ -219,10 +222,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <AppContext.Provider value={{
       // Provide only the remaining context values
       profile,
+      refreshProfile: fetchInitialProfile,
       publishNote,
+      reactToNote,
       likeNote,
       repostNote,
+      quoteRepostNote,
       replyToNote,
+      sendDirectMessage,
       fetchNoteAndReplies,
       updateProfileMetadata,
       // Removed saveScrollPosition and savedScrollAnchorId from context value

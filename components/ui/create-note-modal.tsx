@@ -8,10 +8,20 @@ import { Textarea } from "./textarea"
 interface CreateNoteModalProps {
   isOpen: boolean
   onClose: () => void
-  onPublish: (content: string) => void | Promise<void>
+  onPublish: (content: string) => void | Promise<unknown>
+  title?: string
+  placeholder?: string
+  publishLabel?: string
 }
 
-export function CreateNoteModal({ isOpen, onClose, onPublish }: CreateNoteModalProps) {
+export function CreateNoteModal({
+  isOpen,
+  onClose,
+  onPublish,
+  title = "Create New Note",
+  placeholder = "What's on your mind?",
+  publishLabel = "Publish",
+}: CreateNoteModalProps) {
   const router = useRouter()
   const [content, setContent] = useState("")
   const [isPublishing, setIsPublishing] = useState(false)
@@ -35,11 +45,11 @@ export function CreateNoteModal({ isOpen, onClose, onPublish }: CreateNoteModalP
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-background rounded-lg w-full max-w-lg p-6">
-        <h2 className="text-2xl font-bold mb-4">Create New Note</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
+      <div className="w-full max-w-lg rounded-lg bg-background p-6">
+        <h2 className="text-2xl font-bold mb-4">{title}</h2>
         <Textarea
-          placeholder="What's on your mind?"
+          placeholder={placeholder}
           value={content}
           onChange={(e) => setContent(e.target.value)}
           className="min-h-[150px] mb-4"
@@ -50,7 +60,7 @@ export function CreateNoteModal({ isOpen, onClose, onPublish }: CreateNoteModalP
             onClick={handlePublish} 
             disabled={!content.trim() || isPublishing}
           >
-            {isPublishing ? "Publishing..." : "Publish"}
+            {isPublishing ? "Publishing..." : publishLabel}
           </Button>
         </div>
       </div>

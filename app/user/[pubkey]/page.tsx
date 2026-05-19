@@ -8,9 +8,10 @@ import { ProfileTemplate, UserProfile } from "@/components/templates/ProfileTemp
 export const dynamic = 'force-dynamic'
 
 export default function UserProfilePage({ params }: { params: { pubkey: string } }) {
-  const { profile } = useApp()
+  const { profile, refreshProfile } = useApp()
   const { social } = useApna()
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const isFollowing = Boolean(profile?.following.includes(params.pubkey))
 
   useEffect(() => {
     if (!social) return
@@ -39,15 +40,29 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
     fetchData()
   }, [params.pubkey, social])
 
+  useEffect(() => {
+    if (!social) return
+    const unsubscribe = social.v1.subscribeProfile(params.pubkey, (profile) => {
+      setUserProfile({
+        metadata: profile.metadata,
+        pubkey: profile.pubkey,
+        followers: profile.followers || [],
+        following: profile.following || [],
+      })
+    })
+    return unsubscribe
+  }, [params.pubkey, social])
+
   const handleFollowToggle = async () => {
     if (!social) return
 
     try {
-      if (profile && profile.following.includes(params.pubkey)) {
+      if (isFollowing) {
         await social!.v1.unfollow(params.pubkey)
       } else {
         await social!.v1.follow(params.pubkey)
       }
+      await refreshProfile()
     } catch (error) {
       console.error("Failed to follow/unfollow user:", error)
     }
@@ -71,6 +86,7 @@ export default function UserProfilePage({ params }: { params: { pubkey: string }
       isCurrentUser={profile?.pubkey === params.pubkey}
       showBackButton={true}
       showFollowButton={true}
+      isFollowing={isFollowing}
       onFollowToggle={handleFollowToggle}
       social={social}
     />

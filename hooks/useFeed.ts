@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useApna } from "@/components/providers/ApnaProvider";
 import { feedDB, INITIAL_FETCH_SIZE, LOAD_MORE_SIZE, type StoredNote } from "@/lib/feedDB"; // Import feedDB, constants, and StoredNote type
-import type { INote } from "@apna/sdk";
+import type { INote, NostrEvent } from "@apna/sdk";
 
 // Define the return type for the hook
 interface UseFeedResult {
@@ -26,6 +26,17 @@ export function useFeed(): UseFeedResult {
   // Removed lastTimestamp state
   const [userPubkey, setUserPubkey] = useState<string | null>(null);
   const apna = useApna();
+
+  const mergeNotes = useCallback((incomingNotes: INote[]) => {
+    if (incomingNotes.length === 0) return;
+    setNotes(prev => {
+      const byId = new Map(prev.map(note => [note.id, note]));
+      for (const note of incomingNotes) {
+        byId.set(note.id, note);
+      }
+      return Array.from(byId.values()).sort((a, b) => b.created_at - a.created_at);
+    });
+  }, []);
 
   // --- Fetching Logic (to be moved from AppProvider) ---
 
@@ -80,14 +91,7 @@ export function useFeed(): UseFeedResult {
         }));
         await feedDB.addNotes(userPubkey, notesForDb);
 
-      // Update notes state and then reliably set lastTimestamp from the updated notes array
-      setNotes(prev => {
-        const seenIds = new Set(prev.map(note => note.id));
-        const uniqueNewNotes = freshNotes.filter(note => !seenIds.has(note.id));
-        const updatedNotes = [...uniqueNewNotes, ...prev].sort((a, b) => b.created_at - a.created_at);
-
-        return updatedNotes;
-      });
+      mergeNotes(freshNotes);
     }
     // Removed logic that set lastTimestamp based on current notes
 
@@ -98,7 +102,7 @@ export function useFeed(): UseFeedResult {
     } finally {
       setLoading(false); // Set loading false after all operations
     }
-  }, [apna, userPubkey]); // Removed notes.length dependency
+  }, [apna, mergeNotes, userPubkey]); // Removed notes.length dependency
 
   const refreshFeed = useCallback(async () => {
     if (refreshing || !userPubkey) return;
@@ -126,14 +130,7 @@ export function useFeed(): UseFeedResult {
         }));
         await feedDB.addNotes(userPubkey, notesForDbRefresh);
 
-      // Update notes state after refresh and ensure lastTimestamp is correct
-      setNotes(prev => {
-        const seenIds = new Set(prev.map(note => note.id));
-        const uniqueNewNotes = freshNotes.filter(note => !seenIds.has(note.id));
-        const updatedNotes = [...uniqueNewNotes, ...prev].sort((a, b) => b.created_at - a.created_at);
-
-        return updatedNotes;
-      });
+      mergeNotes(freshNotes);
     }
     // Removed logic setting lastTimestamp after refresh
     } catch (error) {
@@ -141,7 +138,7 @@ export function useFeed(): UseFeedResult {
     } finally {
       setRefreshing(false);
     }
-  }, [apna, userPubkey, refreshing]); // Add refreshing dependency
+  }, [apna, mergeNotes, userPubkey, refreshing]); // Add refreshing dependency
 
   const loadMore = useCallback(async () => {
    // Ensure notes are sorted descending by created_at before getting the oldest
@@ -258,6 +255,30 @@ export function useFeed(): UseFeedResult {
       fetchInitialFeed();
     }
   }, [userPubkey, fetchInitialFeed]);
+
+  useEffect(() => {
+    if (!userPubkey || !apna.social) return;
+
+    const unsubscribe = apna.social.v1.subscribeFeed(
+      'FOLLOWING_FEED',
+      { since: Math.floor(Date.now() / 1000), limit: 100 },
+      (event: NostrEvent) => {
+        if (event.kind !== 1) return;
+        const note = event as INote;
+        mergeNotes([note]);
+        void feedDB.addNotes(userPubkey, [{
+          id: note.id,
+          content: note.content,
+          pubkey: note.pubkey,
+          created_at: note.created_at,
+          tags: note.tags as string[][],
+          sig: note.sig,
+        }]);
+      }
+    );
+
+    return unsubscribe;
+  }, [apna.social, mergeNotes, userPubkey]);
 
 // Removed useEffect that updated lastTimestamp
 
