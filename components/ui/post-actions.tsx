@@ -69,7 +69,7 @@ export function PostActions({
       <CreateNoteModal
         isOpen={quoteOpen}
         onClose={() => setQuoteOpen(false)}
-        onPublish={(content) => quoteRepostNote(id, content)}
+        onPublish={(content, options) => quoteRepostNote(id, content, options)}
         title="Quote Repost"
         placeholder="Add your take..."
         publishLabel="Quote"

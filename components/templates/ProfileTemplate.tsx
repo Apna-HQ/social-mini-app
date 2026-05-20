@@ -9,6 +9,7 @@ import type { ApnaSocialDomain, INote, UserMetadata } from "@apna/sdk"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Fab } from "@/components/ui/fab"
+import type { ComposerPublishHandler } from "@/components/ui/note-composer"
 import { Post } from "@/components/ui/post"
 import { RailCard, SocialHeader, SocialLayout } from "@/components/ui/social-layout"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -40,7 +41,7 @@ interface ProfileTemplateProps {
   onEditSave?: (data: UserMetadata) => void
   onEditCancel?: () => void
   onFollowToggle?: () => Promise<void>
-  onPublishNote?: (content: string) => Promise<unknown>
+  onPublishNote?: ComposerPublishHandler
   social?: ApnaSocialDomain
 }
 

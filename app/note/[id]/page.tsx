@@ -10,7 +10,7 @@ import { useApp } from "../../providers"
 import { useRealtimeThread } from "@/hooks/useRealtimeThread"
 import { Post } from "@/components/ui/post"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
+import { NoteComposer, type ComposerPublishOptions } from "@/components/ui/note-composer"
 import { RailCard, SocialHeader, SocialLayout } from "@/components/ui/social-layout"
 import { getReplyParentId } from "@/lib/utils/social"
 import { noteToPostProps } from "@/lib/utils/post"
@@ -37,12 +37,16 @@ export default function ThreadPage() {
     return map
   }, [replies, rootNote])
 
-  const handleReplySubmit = async (targetId: string, content: string) => {
+  const handleReplySubmit = async (
+    targetId: string,
+    content: string,
+    options?: ComposerPublishOptions
+  ) => {
     if (!content.trim()) {
       setReplyingTo(null)
       return
     }
-    await replyToNote(targetId, content)
+    await replyToNote(targetId, content, options)
     setReplyingTo(null)
     void refresh()
   }
@@ -88,7 +92,7 @@ export default function ThreadPage() {
           <ReplyToggle
             active={replyingTo === rootNote.id}
             onOpen={() => setReplyingTo(rootNote.id)}
-            onSubmit={(content) => handleReplySubmit(rootNote.id, content)}
+            onSubmit={(content, options) => handleReplySubmit(rootNote.id, content, options)}
           />
           <div className="bg-background px-4 py-3 text-sm font-medium">
             Replies
@@ -127,7 +131,7 @@ function ReplyToggle({
 }: {
   active: boolean
   onOpen: () => void
-  onSubmit: (content: string) => Promise<void>
+  onSubmit: (content: string, options?: ComposerPublishOptions) => Promise<void>
 }) {
   if (active) return <ReplyForm onSubmit={onSubmit} />
 
@@ -144,38 +148,18 @@ function ReplyToggle({
 function ReplyForm({
   onSubmit,
 }: {
-  onSubmit: (content: string) => Promise<void>
+  onSubmit: (content: string, options?: ComposerPublishOptions) => Promise<void>
 }) {
-  const [content, setContent] = useState("")
-  const [submitting, setSubmitting] = useState(false)
-
-  const handleSubmit = async () => {
-    if (!content.trim()) return
-    setSubmitting(true)
-    try {
-      await onSubmit(content)
-      setContent("")
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   return (
-    <div className="space-y-2 bg-background px-4 py-3">
-      <Textarea
+    <div className="bg-background px-4 py-3">
+      <NoteComposer
+        variant="compact"
+        showAvatar={false}
         placeholder="Write your reply..."
-        value={content}
-        onChange={(event) => setContent(event.target.value)}
-        className="min-h-[96px]"
+        publishLabel="Reply"
+        onPublish={onSubmit}
+        onCancel={() => onSubmit("")}
       />
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => onSubmit("")}>
-          Cancel
-        </Button>
-        <Button onClick={handleSubmit} disabled={!content.trim() || submitting}>
-          {submitting ? "Replying..." : "Reply"}
-        </Button>
-      </div>
     </div>
   )
 }
@@ -194,7 +178,7 @@ function renderReplies({
   targetId: string
   replyingTo: string | null
   setReplyingTo: (id: string | null) => void
-  onSubmit: (noteId: string, content: string) => Promise<void>
+  onSubmit: (noteId: string, content: string, options?: ComposerPublishOptions) => Promise<void>
   level?: number
 }): React.ReactNode {
   const children = replyMap.get(parentId) || []
@@ -204,7 +188,7 @@ function renderReplies({
       <ReplyToggle
         active={replyingTo === reply.id}
         onOpen={() => setReplyingTo(reply.id)}
-        onSubmit={(content) => onSubmit(reply.id, content)}
+        onSubmit={(content, options) => onSubmit(reply.id, content, options)}
       />
       {renderReplies({
         parentId: reply.id,

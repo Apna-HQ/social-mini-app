@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { Hash, Loader2, RefreshCcw, Rss, Wifi, Zap } from "lucide-react"
+import { Loader2, RefreshCcw, Rss, Wifi } from "lucide-react"
 import type { INote } from "@apna/sdk"
 
 import { useApp } from "./providers"
@@ -10,6 +10,7 @@ import { Post } from "@/components/ui/post"
 import { Fab } from "@/components/ui/fab"
 import { Button } from "@/components/ui/button"
 import { CreateNoteModal } from "@/components/ui/create-note-modal"
+import { NoteComposer, type ComposerPublishHandler } from "@/components/ui/note-composer"
 import { RailCard, SocialHeader, SocialLayout } from "@/components/ui/social-layout"
 import { noteToPostProps } from "@/lib/utils/post"
 
@@ -18,8 +19,8 @@ export default function Home() {
   const { notes, loading, loadingMore, refreshing, error, loadMore, refreshFeed } = useFeed()
   const { publishNote, profile } = useApp()
 
-  const handlePublish = async (content: string) => {
-    await publishNote(content)
+  const handlePublish: ComposerPublishHandler = async (content, options) => {
+    await publishNote(content, options)
     void refreshFeed()
   }
 
@@ -47,10 +48,16 @@ export default function Home() {
           }
         />
 
-        <ComposerPreview
-          name={profile?.metadata.name as string | undefined}
-          onCompose={() => setComposerOpen(true)}
-        />
+        <section className="border-b border-border/80 bg-background px-4 py-4">
+          <NoteComposer
+            onPublish={handlePublish}
+            avatarName={
+              (profile?.metadata.display_name as string | undefined) ||
+              (profile?.metadata.name as string | undefined)
+            }
+            avatarImage={profile?.metadata.picture as string | undefined}
+          />
+        </section>
 
         <div className="divide-y divide-border/80">
           {notes.map((note: INote) => (
@@ -68,50 +75,13 @@ export default function Home() {
         />
       </SocialLayout>
 
-      <Fab onPublish={handlePublish} />
+      <Fab onClick={() => setComposerOpen(true)} />
       <CreateNoteModal
         isOpen={composerOpen}
         onClose={() => setComposerOpen(false)}
         onPublish={handlePublish}
       />
     </>
-  )
-}
-
-function ComposerPreview({
-  name,
-  onCompose,
-}: {
-  name?: string
-  onCompose: () => void
-}) {
-  return (
-    <section className="border-b border-border/80 bg-background px-4 py-4">
-      <div className="grid grid-cols-[40px_1fr] gap-3">
-        <span className="grid h-10 w-10 place-items-center rounded-full border border-border bg-secondary text-sm font-semibold">
-          {(name || "U").charAt(0).toUpperCase()}
-        </span>
-        <div>
-          <button
-            type="button"
-            onClick={onCompose}
-            className="w-full rounded-lg border border-border/80 bg-card px-3 py-3 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary/40"
-          >
-            What&apos;s happening?
-          </button>
-          <div className="mt-3 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Hash className="h-4 w-4" />
-              <Zap className="h-4 w-4" />
-              <Wifi className="h-4 w-4" />
-            </div>
-            <Button size="sm" className="rounded-full px-4" onClick={onCompose}>
-              Post
-            </Button>
-          </div>
-        </div>
-      </div>
-    </section>
   )
 }
 

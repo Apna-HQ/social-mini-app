@@ -5,6 +5,7 @@ import type {
   DirectMessage,
   Note,
   NoteAndReplies,
+  NotePublishOptions,
   NostrEvent,
   UserMetadata,
 } from "@apna/sdk";
@@ -22,12 +23,12 @@ interface Profile {
 interface AppContextType {
   profile: Profile | null; // Keep profile and other non-feed related items
   refreshProfile: () => Promise<void>
-  publishNote: (content: string) => Promise<Note | void>
+  publishNote: (content: string, options?: NotePublishOptions) => Promise<Note | void>
   reactToNote: (id: string, content?: string) => Promise<NostrEvent | void>
   likeNote: (id: string) => Promise<NostrEvent | void>
   repostNote: (id: string) => Promise<NostrEvent | void>
-  quoteRepostNote: (id: string, content: string) => Promise<NostrEvent | void>
-  replyToNote: (id: string, content: string) => Promise<Note | void>
+  quoteRepostNote: (id: string, content: string, options?: NotePublishOptions) => Promise<NostrEvent | void>
+  replyToNote: (id: string, content: string, options?: NotePublishOptions) => Promise<Note | void>
   sendDirectMessage: (pubkey: string, content: string) => Promise<DirectMessage | void>
   fetchNoteAndReplies: (id: string) => Promise<NoteAndReplies>
   updateProfileMetadata: (metadata: UserMetadata) => Promise<void>
@@ -82,11 +83,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     void fetchInitialProfile();
   }, [fetchInitialProfile]); // Depend on apna context
 
-  const publishNote = async (content: string) => {
+  const publishNote = async (content: string, options?: NotePublishOptions) => {
     if (!content.trim()) return undefined
     try {
       await ensureApnaInitialized()
-      return await apna.social!.v1.publishNote(content)
+      return await apna.social!.v1.publishNote(content, options)
     } catch (error) {
       console.error("Failed to publish note:", error)
       throw error
@@ -125,28 +126,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const quoteRepostNote = async (id: string, content: string) => {
+  const quoteRepostNote = async (id: string, content: string, options?: NotePublishOptions) => {
     if (!profile?.pubkey) {
       throw new Error('No active user profile')
     }
 
     try {
       await ensureApnaInitialized()
-      return await apna.social!.v1.quoteRepost(id, content)
+      return await apna.social!.v1.quoteRepost(id, content, options)
     } catch (error) {
       console.error("Failed to quote repost note:", error)
       throw error
     }
   }
 
-  const replyToNote = async (id: string, content: string) => {
+  const replyToNote = async (id: string, content: string, options?: NotePublishOptions) => {
     if (!profile?.pubkey) {
       throw new Error('No active user profile')
     }
     
     try {
       await ensureApnaInitialized()
-      return await apna.social!.v1.reply(id, content)
+      return await apna.social!.v1.reply(id, content, options)
     } catch (error) {
       console.error("Failed to reply to note:", error)
       throw error
