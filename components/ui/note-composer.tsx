@@ -204,9 +204,13 @@ export function NoteComposer({
   }, [activeToken, mentionMap, profiles])
 
   const showSuggestions = focused && !!activeToken && suggestions.length > 0
+  const referencedNpubs = useMemo(() => getReferencedNpubs(content), [content])
   const previewMentions = useMemo(
-    () => Array.from(mentionMap.values()),
-    [mentionMap]
+    () =>
+      Array.from(mentionMap.values()).filter((mention) =>
+        referencedNpubs.has(mentionNpub(mention).toLowerCase())
+      ),
+    [mentionMap, referencedNpubs]
   )
 
   const addMention = useCallback((candidate: ComposerMention) => {
@@ -233,11 +237,6 @@ export function NoteComposer({
         const profile = await social.v1.userProfile(npub)
         const candidate = toCandidate(profile)
         addMention(candidate)
-        setContent((current) => {
-          const token = `nostr:${npub}`
-          if (!current.includes(token)) return current
-          return current.split(token).join(`@${candidate.handle}`)
-        })
       } finally {
         pendingNpubs.current.delete(npub)
       }
@@ -267,11 +266,11 @@ export function NoteComposer({
     const token = activeToken
     if (!token) return
 
-    const handle = `@${candidate.handle}`
+    const reference = `nostr:${mentionNpub(candidate)}`
     const before = content.slice(0, token.start)
     const after = content.slice(token.end)
-    const nextContent = `${before}${handle} ${after}`
-    const nextCaret = before.length + handle.length + 1
+    const nextContent = `${before}${reference} ${after}`
+    const nextCaret = before.length + reference.length + 1
 
     addMention(candidate)
     setContent(nextContent)
@@ -298,10 +297,14 @@ export function NoteComposer({
   }
 
   const buildPublishOptions = (): ComposerPublishOptions | undefined => {
-    const mentions = Array.from(mentionMap.values()).map((mention) => ({
-      pubkey: mention.pubkey,
-      marker: "mention",
-    }))
+    const mentions = Array.from(mentionMap.values())
+      .filter((mention) =>
+        referencedNpubs.has(mentionNpub(mention).toLowerCase())
+      )
+      .map((mention) => ({
+        pubkey: mention.pubkey,
+        marker: "mention",
+      }))
 
     return mentions.length > 0 ? { mentions } : undefined
   }
@@ -571,19 +574,29 @@ export function NoteComposer({
 
 function getActiveToken(content: string, caret: number): ActiveToken | null {
   const before = content.slice(0, caret)
-  const match = /(^|\s)(@?[A-Za-z0-9_.-]{2,})$/.exec(before)
+  const match = /(^|\s)@([A-Za-z0-9_.-]*)$/.exec(before)
   if (!match) return null
 
   const token = match[2]
-  const query = token.startsWith("@") ? token.slice(1) : token
-  if (query.length < 2) return null
 
   const start = match.index + match[1].length
   return {
     start,
     end: caret,
-    query,
+    query: token,
   }
+}
+
+function getReferencedNpubs(content: string): Set<string> {
+  return new Set(
+    Array.from(content.matchAll(NPUB_MENTION_REGEX))
+      .map((match) => match[1]?.toLowerCase())
+      .filter(Boolean) as string[]
+  )
+}
+
+function mentionNpub(mention: ComposerMention): string {
+  return mention.npub || hexToNpub(mention.pubkey)
 }
 
 function toCandidates(profiles: UserProfile[]): MentionCandidate[] {

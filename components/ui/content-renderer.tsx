@@ -7,14 +7,16 @@ import type React from "react"
 import { Card, CardContent, CardHeader } from "./card"
 import { AuthorInfo } from "./author-info"
 import { useApna } from "@/components/providers/ApnaProvider"
+import { trimNpub } from "@/lib/utils/nostr"
 
 interface ContentSegment {
-  type: "text" | "nostr" | "image" | "hashtag" | "youtube" | "url" | "audio" | "video"
+  type: "text" | "nostr" | "profile" | "image" | "hashtag" | "youtube" | "url" | "audio" | "video"
   content: string
 }
 
 export interface ContentMention {
   pubkey: string
+  npub?: string
   name: string
   handle?: string
   picture?: string
@@ -142,6 +144,11 @@ function parseContent(content: string): ContentSegment[] {
         type: "nostr",
         content: matchedContent.slice(6) // Remove "nostr:" prefix
       })
+    } else if (matchedContent.startsWith("nostr:npub")) {
+      segments.push({
+        type: "profile",
+        content: matchedContent.slice(6)
+      })
     } else if (matchedContent.match(imageRegex)) {
       segments.push({
         type: "image",
@@ -247,13 +254,15 @@ export function ContentRenderer({
   const [referencedNotes, setReferencedNotes] = useState<{ [key: string]: ReferencedNote }>({})
   const [parentNote, setParentNote] = useState<ReferencedNote | null>(null)
   const segments = useMemo(() => parseContent(content), [content])
-  const mentionsByHandle = useMemo(() => {
-    const map = new Map<string, ContentMention>()
+  const mentionLookup = useMemo(() => {
+    const byHandle = new Map<string, ContentMention>()
+    const byNpub = new Map<string, ContentMention>()
     mentions.forEach((mention) => {
       const handle = (mention.handle || mention.name || "").replace(/^@/, "")
-      if (handle) map.set(handle.toLowerCase(), mention)
+      if (handle) byHandle.set(handle.toLowerCase(), mention)
+      if (mention.npub) byNpub.set(mention.npub.toLowerCase(), mention)
     })
-    return map
+    return { byHandle, byNpub }
   }, [mentions])
 
   // Fetch parent note if parentNoteId is provided
@@ -331,8 +340,16 @@ export function ContentRenderer({
           case "text":
             return (
               <span key={index}>
-                {renderTextWithMentions(segment.content, mentionsByHandle, router)}
+                {renderTextWithMentions(segment.content, mentionLookup.byHandle, router)}
               </span>
+            )
+
+          case "profile":
+            return renderProfileMention(
+              segment.content,
+              mentionLookup.byNpub,
+              router,
+              index
             )
 
           case "nostr": {
@@ -455,4 +472,32 @@ function renderTextWithMentions(
   if (currentIndex === 0) return text
   if (currentIndex < text.length) parts.push(text.slice(currentIndex))
   return parts
+}
+
+function renderProfileMention(
+  npub: string,
+  mentionsByNpub: Map<string, ContentMention>,
+  router: ReturnType<typeof useRouter>,
+  key: React.Key
+) {
+  const mention = mentionsByNpub.get(npub.toLowerCase())
+  const label = mention
+    ? `@${mention.handle || mention.name}`
+    : `@${trimNpub(npub, 8, 4)}`
+  const target = mention?.pubkey || npub
+
+  return (
+    <button
+      key={key}
+      type="button"
+      title={`nostr:${npub}`}
+      className="inline-flex items-center rounded-md bg-secondary px-1.5 py-0.5 font-medium text-secondary-foreground transition-colors hover:bg-accent"
+      onClick={(event) => {
+        event.stopPropagation()
+        router.push(`/user/${target}`)
+      }}
+    >
+      {label}
+    </button>
+  )
 }
