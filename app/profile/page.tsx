@@ -6,6 +6,15 @@ import { useState, useEffect } from "react"
 import { ProfileTemplate, UserProfile } from "@/components/templates/ProfileTemplate"
 import type { UserMetadata } from "@apna/sdk"
 
+function profileFromAppProfile(appProfile: NonNullable<ReturnType<typeof useApp>["profile"]>): UserProfile {
+  return {
+    metadata: appProfile.metadata || {},
+    pubkey: appProfile.pubkey,
+    followers: appProfile.followers || [],
+    following: appProfile.following || [],
+  }
+}
+
 export default function ProfilePage() {
   const { profile: appProfile, updateProfileMetadata } = useApp()
   const { social } = useApna()
@@ -14,31 +23,49 @@ export default function ProfilePage() {
   const [editForm, setEditForm] = useState<UserMetadata>({})
 
   useEffect(() => {
-    if (appProfile && social) {
-      const fetchData = async () => {
-        try {
-          await fetchFreshProfile()
+    if (!appProfile) return
 
-        } catch (error) {
-          console.error("Failed to fetch user data:", error)
-        }
+    const shellProfile = profileFromAppProfile(appProfile)
+    setUserProfile((current) => {
+      if (current?.pubkey !== appProfile.pubkey) return shellProfile
+      return {
+        metadata: Object.keys(current.metadata || {}).length > 0
+          ? current.metadata
+          : shellProfile.metadata,
+        pubkey: appProfile.pubkey,
+        followers: current.followers.length > 0 ? current.followers : shellProfile.followers,
+        following: current.following.length > 0 ? current.following : shellProfile.following,
       }
+    })
+    setEditForm(shellProfile.metadata)
+  }, [appProfile])
 
-      const fetchFreshProfile = async () => {
-        try {
-          const freshProfile = await social!.v1.userProfile(appProfile.pubkey)
-          const profileWithPubkey = {
-            ...freshProfile,
-            pubkey: appProfile.pubkey // Ensure pubkey is included
-          }
-          setUserProfile(profileWithPubkey)
-          setEditForm(profileWithPubkey.metadata || {})
-        } catch (error) {
-          console.error("Failed to fetch fresh profile:", error)
+  useEffect(() => {
+    if (!appProfile || !social) return
+
+    let cancelled = false
+    const fetchFreshProfile = async () => {
+      try {
+        const freshProfile = await social.v1.userProfile(appProfile.pubkey)
+        if (cancelled) return
+
+        const profileWithPubkey = {
+          ...freshProfile,
+          pubkey: appProfile.pubkey,
+          metadata: freshProfile.metadata || {},
+          followers: freshProfile.followers || [],
+          following: freshProfile.following || [],
         }
+        setUserProfile(profileWithPubkey)
+        setEditForm(profileWithPubkey.metadata)
+      } catch (error) {
+        console.error("Failed to fetch fresh profile:", error)
       }
+    }
 
-      fetchData()
+    void fetchFreshProfile()
+    return () => {
+      cancelled = true
     }
   }, [appProfile, social])
 

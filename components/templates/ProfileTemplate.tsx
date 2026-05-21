@@ -100,6 +100,7 @@ export function ProfileTemplate({
           before ? mergeById(current, convertedCached) : convertedCached
         )
         setHasMore(cachedNotes.length >= (before ? LOAD_MORE_SIZE : INITIAL_FETCH_SIZE))
+        if (!before) setLoadingNotes(false)
       }
 
       if (!social) {

@@ -9,6 +9,7 @@ import type {
   NostrEvent,
   UserMetadata,
 } from "@apna/sdk";
+import { getActivePubkey, getActiveUserProfile } from "@/lib/utils/identity";
 
 interface Profile {
   metadata: UserMetadata
@@ -55,12 +56,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Removed useEffect that saved window.scrollY on unmount
 
-  // Removed fetchInitialFeed, refreshFeed, loadMore functions
-  // Fetch initial profile info (Keep this part)
-  const fetchInitialProfile = useCallback(async () => {
+  const refreshProfile = useCallback(async () => {
     try {
-      // identity.v1.me() returns UserProfile with pubkey (hex) directly
-      const userProfile = await apna.identity!.v1.me();
+      const userProfile = await getActiveUserProfile(apna.identity);
 
       if (userProfile && userProfile.pubkey) {
         setProfile({
@@ -71,12 +69,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           following: userProfile.following || [],
         });
       } else {
+        console.error("No active user pubkey found for profile refresh");
+      }
+    } catch (error) {
+      console.error("Failed to refresh profile:", error);
+    }
+  }, [apna]);
+
+  // Removed fetchInitialFeed, refreshFeed, loadMore functions
+  // Fetch initial profile info (Keep this part)
+  const fetchInitialProfile = useCallback(async () => {
+    try {
+      const pubkey = await getActivePubkey(apna.identity);
+
+      if (pubkey) {
+        setProfile((current) => {
+          if (current?.pubkey === pubkey) return current;
+          return {
+            metadata: {},
+            pubkey,
+            stats: { posts: 0 },
+            followers: [],
+            following: [],
+          };
+        });
+        void refreshProfile();
+      } else {
         console.error("No active user pubkey found for initial profile fetch");
       }
     } catch (error) {
       console.error("Failed to fetch initial profile:", error);
     }
-  }, [apna]);
+  }, [apna, refreshProfile]);
 
   // Fetch profile on mount
   useEffect(() => {
@@ -173,10 +197,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await ensureApnaInitialized()
       const result = await apna.identity!.v1.updateProfile(metadata)
       if (result) {
-        setProfile({
-          ...profile!,
-          metadata: result.metadata
-        })
+        setProfile((current) => ({
+          metadata: result.metadata,
+          pubkey: result.pubkey,
+          stats: current?.stats ?? { posts: 0 },
+          followers: result.followers || current?.followers || [],
+          following: result.following || current?.following || [],
+        }))
       }
     } catch (error) {
       console.error("Failed to update profile metadata:", error)
@@ -223,7 +250,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <AppContext.Provider value={{
       // Provide only the remaining context values
       profile,
-      refreshProfile: fetchInitialProfile,
+      refreshProfile,
       publishNote,
       reactToNote,
       likeNote,

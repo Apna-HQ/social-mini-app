@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useApna } from '@/components/providers/ApnaProvider'
+import { socialCacheDB } from '@/lib/socialCacheDB'
 
 interface UserProfile {
   name?: string
+  about?: string
   picture?: string
   pubkey: string
 }
@@ -23,7 +25,7 @@ export function useUserProfile(pubkey: string): UserProfile {
   const apna = useApna()
 
   useEffect(() => {
-    if (!pubkey) return
+    if (!pubkey || !apna.social) return
     const cached = metadataCache.get(pubkey)
     if (cached) {
       setProfile(cached)
@@ -31,20 +33,22 @@ export function useUserProfile(pubkey: string): UserProfile {
     }
 
     let cancelled = false
+    void socialCacheDB.getProfile(pubkey).then((cachedMetadata) => {
+      if (cancelled || !cachedMetadata || metadataCache.has(pubkey)) return
+
+      const cachedProfile = profileFromMetadata(pubkey, cachedMetadata)
+      metadataCache.set(pubkey, cachedProfile)
+      setProfile(cachedProfile)
+    })
+
     const existing = inFlight.get(pubkey)
     const work = existing ?? (async () => {
       // userMetadata fetches only kind-0 (avatar/name) instead of the
       // full profile (which also pulls followers — much heavier).
       const meta = (await apna.social!.v1.userMetadata(pubkey).catch(() => ({}))) || {}
-      const displayName =
-        (meta as { display_name?: string }).display_name ||
-        (meta as { name?: string }).name
-      const next: UserProfile = {
-        name: displayName,
-        picture: (meta as { picture?: string }).picture,
-        pubkey,
-      }
+      const next = profileFromMetadata(pubkey, meta)
       metadataCache.set(pubkey, next)
+      void socialCacheDB.saveProfile(pubkey, meta)
       return next
     })()
     if (!existing) inFlight.set(pubkey, work)
@@ -58,4 +62,20 @@ export function useUserProfile(pubkey: string): UserProfile {
   }, [pubkey, apna])
 
   return profile
+}
+
+function profileFromMetadata(pubkey: string, metadata: unknown): UserProfile {
+  const meta = (metadata || {}) as {
+    about?: string
+    display_name?: string
+    name?: string
+    picture?: string
+  }
+
+  return {
+    name: meta.display_name || meta.name,
+    about: meta.about,
+    picture: meta.picture,
+    pubkey,
+  }
 }

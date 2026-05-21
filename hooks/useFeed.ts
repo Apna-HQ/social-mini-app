@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { useApna } from "@/components/providers/ApnaProvider";
-import { feedDB, INITIAL_FETCH_SIZE, LOAD_MORE_SIZE, type StoredNote } from "@/lib/feedDB"; // Import feedDB, constants, and StoredNote type
+import { socialCacheDB, type StoredNote } from "@/lib/socialCacheDB";
+import { getActivePubkey } from "@/lib/utils/identity";
 import type { INote, NostrEvent } from "@apna/sdk";
+
+const INITIAL_FETCH_SIZE = 20;
+const LOAD_MORE_SIZE = 20;
 
 // Define the return type for the hook
 interface UseFeedResult {
@@ -23,7 +27,6 @@ export function useFeed(): UseFeedResult {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Removed lastTimestamp state
   const [userPubkey, setUserPubkey] = useState<string | null>(null);
   const apna = useApna();
 
@@ -46,13 +49,13 @@ export function useFeed(): UseFeedResult {
       setLoading(false);
       return;
     }
-   setLoading(true);
-   setError(null);
-   try {
-     const cachedStoredNotes: StoredNote[] = await feedDB.getNotes(userPubkey, INITIAL_FETCH_SIZE);
-     const cachedNotes: INote[] = cachedStoredNotes.map(storedNoteToINote);
+    setLoading(true);
+    setError(null);
+    try {
+      const cachedStoredNotes: StoredNote[] = await socialCacheDB.getItems('feed', userPubkey, INITIAL_FETCH_SIZE);
+      const cachedNotes: INote[] = cachedStoredNotes.map(storedNoteToINote);
 
-     if (cachedNotes.length > 0) {
+      if (cachedNotes.length > 0) {
         setNotes(cachedNotes);
         // Show cached notes immediately so the user isn't staring at a spinner
         // while we fan out the network query in the background.
@@ -63,21 +66,21 @@ export function useFeed(): UseFeedResult {
       const fetchSize = cachedNotes.length === 0 ? INITIAL_FETCH_SIZE : 20; // Fetch more if cache is empty
       let latestTimestamp: number | undefined = undefined;
       if (cachedNotes.length > 0) {
-        const timestamp = await feedDB.getLatestTimestamp(userPubkey);
+        const timestamp = await socialCacheDB.getLatestTimestamp('feed', userPubkey);
         if (timestamp !== null) {
-           latestTimestamp = timestamp;
+          latestTimestamp = timestamp;
         }
       }
 
-     // social.v1.feed replaces the compat nostr.fetchFeed
-     const freshEvents = await apna.social!.v1.feed(
-       'FOLLOWING_FEED',
-       { since: latestTimestamp, limit: fetchSize }
-     );
-     // Filter for kind 1 notes and map to INote if necessary (assuming IEvent structure matches INote for kind 1)
-     // Assuming IEvent structure for kind 1 is compatible with INote or needs mapping
-     // Let's assume direct compatibility for now, adjust if INote has extra fields not in IEvent
-     const freshNotes: INote[] = freshEvents.filter(event => event.kind === 1) as INote[];
+      // social.v1.feed replaces the compat nostr.fetchFeed
+      const freshEvents = await apna.social!.v1.feed(
+        'FOLLOWING_FEED',
+        { since: latestTimestamp, limit: fetchSize }
+      );
+      // Filter for kind 1 notes and map to INote if necessary (assuming IEvent structure matches INote for kind 1)
+      // Assuming IEvent structure for kind 1 is compatible with INote or needs mapping
+      // Let's assume direct compatibility for now, adjust if INote has extra fields not in IEvent
+      const freshNotes: INote[] = freshEvents.filter(event => event.kind === 1) as INote[];
 
       if (freshNotes.length > 0) {
         // Map INote[] to BaseNote[] before adding to DB
@@ -89,11 +92,11 @@ export function useFeed(): UseFeedResult {
           tags: note.tags as string[][], // Assert type compatibility
           sig: note.sig,
         }));
-        await feedDB.addNotes(userPubkey, notesForDb);
+        await socialCacheDB.addItems('feed', userPubkey, notesForDb);
 
-      mergeNotes(freshNotes);
-    }
-    // Removed logic that set lastTimestamp based on current notes
+        mergeNotes(freshNotes);
+      }
+      // Removed logic that set lastTimestamp based on current notes
 
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -109,14 +112,14 @@ export function useFeed(): UseFeedResult {
 
     setRefreshing(true);
     try {
-     const timestamp = await feedDB.getLatestTimestamp(userPubkey);
+      const timestamp = await socialCacheDB.getLatestTimestamp('feed', userPubkey);
 
-     // social.v1.feed replaces the compat nostr.fetchFeed
-     const freshEvents = await apna.social!.v1.feed(
-       'FOLLOWING_FEED',
-       { since: timestamp || undefined, limit: 20 }
-     );
-     const freshNotes: INote[] = freshEvents.filter(event => event.kind === 1) as INote[];
+      // social.v1.feed replaces the compat nostr.fetchFeed
+      const freshEvents = await apna.social!.v1.feed(
+        'FOLLOWING_FEED',
+        { since: timestamp || undefined, limit: 20 }
+      );
+      const freshNotes: INote[] = freshEvents.filter(event => event.kind === 1) as INote[];
 
       if (freshNotes.length > 0) {
         // Map INote[] to BaseNote[] before adding to DB
@@ -128,11 +131,11 @@ export function useFeed(): UseFeedResult {
           tags: note.tags as string[][], // Assert type compatibility
           sig: note.sig,
         }));
-        await feedDB.addNotes(userPubkey, notesForDbRefresh);
+        await socialCacheDB.addItems('feed', userPubkey, notesForDbRefresh);
 
-      mergeNotes(freshNotes);
-    }
-    // Removed logic setting lastTimestamp after refresh
+        mergeNotes(freshNotes);
+      }
+      // Removed logic setting lastTimestamp after refresh
     } catch (error) {
       console.error("Failed to refresh feed:", error);
     } finally {
@@ -141,56 +144,56 @@ export function useFeed(): UseFeedResult {
   }, [apna, mergeNotes, userPubkey, refreshing]); // Add refreshing dependency
 
   const loadMore = useCallback(async () => {
-   // Ensure notes are sorted descending by created_at before getting the oldest
-   const sortedNotes = [...notes].sort((a, b) => b.created_at - a.created_at);
-  const oldestNoteTimestamp = sortedNotes.length > 0 ? sortedNotes[sortedNotes.length - 1].created_at : null;
-  console.log(`[loadMore] Attempting to load more before timestamp: ${oldestNoteTimestamp}`);
+    // Ensure notes are sorted descending by created_at before getting the oldest
+    const sortedNotes = [...notes].sort((a, b) => b.created_at - a.created_at);
+    const oldestNoteTimestamp = sortedNotes.length > 0 ? sortedNotes[sortedNotes.length - 1].created_at : null;
+    console.log(`[loadMore] Attempting to load more before timestamp: ${oldestNoteTimestamp}`);
 
-  if (loadingMore || oldestNoteTimestamp === null || !userPubkey) {
-    console.log(`[loadMore] Aborting: loadingMore=${loadingMore}, oldestNoteTimestamp=${oldestNoteTimestamp}, userPubkey=${!!userPubkey}`);
-    if (oldestNoteTimestamp === null && sortedNotes.length > 0) {
-      console.warn("[loadMore] Oldest note timestamp is null despite notes existing.");
+    if (loadingMore || oldestNoteTimestamp === null || !userPubkey) {
+      console.log(`[loadMore] Aborting: loadingMore=${loadingMore}, oldestNoteTimestamp=${oldestNoteTimestamp}, userPubkey=${!!userPubkey}`);
+      if (oldestNoteTimestamp === null && sortedNotes.length > 0) {
+        console.warn("[loadMore] Oldest note timestamp is null despite notes existing.");
+      }
+      return;
     }
-    return;
-  }
 
     setLoadingMore(true);
     try {
       // Use the already sorted notes array for seen IDs
       const seenNoteIds = new Set(sortedNotes.map(note => note.id));
 
-     // Try fetching from cache first
-    console.log(`[loadMore] Fetching from cache before ${oldestNoteTimestamp}...`);
-    const cachedOlderStoredNotes: StoredNote[] = await feedDB.getNotes(userPubkey, LOAD_MORE_SIZE, oldestNoteTimestamp);
-    console.log(`[loadMore] Fetched ${cachedOlderStoredNotes.length} notes from cache.`);
-     const cachedOlderNotes: INote[] = cachedOlderStoredNotes.map(storedNoteToINote);
-    const uniqueCachedNotes = cachedOlderNotes.filter(note => !seenNoteIds.has(note.id));
-    console.log(`[loadMore] Found ${uniqueCachedNotes.length} unique notes from cache after filtering.`); // Add this log
+      // Try fetching from cache first
+      console.log(`[loadMore] Fetching from cache before ${oldestNoteTimestamp}...`);
+      const cachedOlderStoredNotes: StoredNote[] = await socialCacheDB.getItems('feed', userPubkey, LOAD_MORE_SIZE, oldestNoteTimestamp);
+      console.log(`[loadMore] Fetched ${cachedOlderStoredNotes.length} notes from cache.`);
+      const cachedOlderNotes: INote[] = cachedOlderStoredNotes.map(storedNoteToINote);
+      const uniqueCachedNotes = cachedOlderNotes.filter(note => !seenNoteIds.has(note.id));
+      console.log(`[loadMore] Found ${uniqueCachedNotes.length} unique notes from cache after filtering.`); // Add this log
 
-     let newNotesFound = false;
-     // No need for oldestTimestampFromBatch, we'll derive from the final notes array
+      let newNotesFound = false;
+      // No need for oldestTimestampFromBatch, we'll derive from the final notes array
 
       if (uniqueCachedNotes.length > 0) {
         newNotesFound = true;
-       uniqueCachedNotes.forEach(note => seenNoteIds.add(note.id));
-       // Restore sorting
-       setNotes(prevNotes =>
-         [...prevNotes, ...uniqueCachedNotes].sort((a, b) => b.created_at - a.created_at)
-       );
-     }
+        uniqueCachedNotes.forEach(note => seenNoteIds.add(note.id));
+        // Restore sorting
+        setNotes(prevNotes =>
+          [...prevNotes, ...uniqueCachedNotes].sort((a, b) => b.created_at - a.created_at)
+        );
+      }
 
-     // If cache didn't provide enough notes, fetch from network
-     if (uniqueCachedNotes.length < LOAD_MORE_SIZE) {
-      console.log(`[loadMore] Fetching from network before ${oldestNoteTimestamp}...`);
-      // social.v1.feed replaces the compat nostr.fetchFeed
-       const olderEvents = await apna.social!.v1.feed(
-         'FOLLOWING_FEED',
-         { until: oldestNoteTimestamp, limit: LOAD_MORE_SIZE }
-       );
-      const olderNotes: INote[] = olderEvents.filter(event => event.kind === 1) as INote[];
-      console.log(`[loadMore] Fetched ${olderEvents.length} events from network, ${olderNotes.length} are notes.`);
-      const uniqueNetworkNotes = olderNotes.filter(note => !seenNoteIds.has(note.id));
-      console.log(`[loadMore] Found ${uniqueNetworkNotes.length} unique notes from network after filtering.`); // Add this log
+      // If cache didn't provide enough notes, fetch from network
+      if (uniqueCachedNotes.length < LOAD_MORE_SIZE) {
+        console.log(`[loadMore] Fetching from network before ${oldestNoteTimestamp}...`);
+        // social.v1.feed replaces the compat nostr.fetchFeed
+        const olderEvents = await apna.social!.v1.feed(
+          'FOLLOWING_FEED',
+          { until: oldestNoteTimestamp, limit: LOAD_MORE_SIZE }
+        );
+        const olderNotes: INote[] = olderEvents.filter(event => event.kind === 1) as INote[];
+        console.log(`[loadMore] Fetched ${olderEvents.length} events from network, ${olderNotes.length} are notes.`);
+        const uniqueNetworkNotes = olderNotes.filter(note => !seenNoteIds.has(note.id));
+        console.log(`[loadMore] Found ${uniqueNetworkNotes.length} unique notes from network after filtering.`); // Add this log
 
         if (uniqueNetworkNotes.length > 0) {
           newNotesFound = true;
@@ -203,36 +206,36 @@ export function useFeed(): UseFeedResult {
             tags: note.tags as string[][], // Assert type compatibility
             sig: note.sig,
           }));
-          await feedDB.addNotes(userPubkey, networkNotesForDb);
+          await socialCacheDB.addItems('feed', userPubkey, networkNotesForDb);
 
-         // Restore sorting
-         setNotes(prevNotes =>
-           [...prevNotes, ...uniqueNetworkNotes].sort((a, b) => b.created_at - a.created_at)
-         );
+          // Restore sorting
+          setNotes(prevNotes =>
+            [...prevNotes, ...uniqueNetworkNotes].sort((a, b) => b.created_at - a.created_at)
+          );
         }
       }
 
-    // No need to update lastTimestamp state anymore
+      // No need to update lastTimestamp state anymore
 
     } catch (error) {
       console.error("Failed to load more notes:", error);
     } finally {
       setLoadingMore(false);
     }
-  // Add notes.length as dependency to re-evaluate oldestNoteTimestamp when notes change
+    // Add notes.length as dependency to re-evaluate oldestNoteTimestamp when notes change
   }, [apna, userPubkey, loadingMore, notes, notes.length]);
 
   // --- Effects ---
 
   useEffect(() => {
+    let cancelled = false;
     // Fetch user pubkey first, then initial feed
     const initialize = async () => {
       setLoading(true);
       try {
-        // identity.v1.me() returns UserProfile with pubkey (hex) directly
-        const userProfile = await apna.identity!.v1.me();
-        const pubkey: string | null = userProfile?.pubkey ?? null;
+        const pubkey = await getActivePubkey(apna.identity);
 
+        if (cancelled) return;
         if (pubkey) {
           setUserPubkey(pubkey);
           // Now fetch initial feed using this pubkey
@@ -246,8 +249,11 @@ export function useFeed(): UseFeedResult {
         setLoading(false);
       }
     };
-    initialize();
-  }, [apna]); // Dependency on apna ensures it runs when apna context is ready
+    void initialize();
+    return () => {
+      cancelled = true;
+    };
+  }, [apna.identity]); // Dependency on apna ensures it runs when apna context is ready
 
   // Effect to run fetchInitialFeed once userPubkey is set
   useEffect(() => {
@@ -266,7 +272,7 @@ export function useFeed(): UseFeedResult {
         if (event.kind !== 1) return;
         const note = event as INote;
         mergeNotes([note]);
-        void feedDB.addNotes(userPubkey, [{
+        void socialCacheDB.addItems('feed', userPubkey, [{
           id: note.id,
           content: note.content,
           pubkey: note.pubkey,
@@ -288,7 +294,7 @@ export function useFeed(): UseFeedResult {
       if (!note || note.kind !== 1) return;
 
       mergeNotes([note]);
-      void feedDB.addNotes(userPubkey, [{
+      void socialCacheDB.addItems('feed', userPubkey, [{
         id: note.id,
         content: note.content,
         pubkey: note.pubkey,

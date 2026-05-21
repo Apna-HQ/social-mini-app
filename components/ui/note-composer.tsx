@@ -127,15 +127,26 @@ export function NoteComposer({
     () => new Map()
   )
   const [profiles, setProfiles] = useState<MentionCandidate[]>([])
+  const [shouldLoadProfiles, setShouldLoadProfiles] = useState(autoFocus)
 
   useEffect(() => {
     if (!autoFocus) return
+    setShouldLoadProfiles(true)
     const timeout = window.setTimeout(() => textareaRef.current?.focus(), 50)
     return () => window.clearTimeout(timeout)
   }, [autoFocus])
 
+  const activeToken = useMemo(
+    () => getActiveToken(content, caret),
+    [content, caret]
+  )
+
   useEffect(() => {
-    if (!social || !identity) return
+    if (activeToken) setShouldLoadProfiles(true)
+  }, [activeToken])
+
+  useEffect(() => {
+    if (!social || !identity || !shouldLoadProfiles) return
 
     let cancelled = false
     const loadProfiles = async () => {
@@ -170,12 +181,7 @@ export function NoteComposer({
     return () => {
       cancelled = true
     }
-  }, [identity, social])
-
-  const activeToken = useMemo(
-    () => getActiveToken(content, caret),
-    [content, caret]
-  )
+  }, [identity, shouldLoadProfiles, social])
 
   const suggestions = useMemo(() => {
     if (!activeToken) return []
@@ -418,7 +424,10 @@ export function NoteComposer({
             onClick={(event) => updateCaret(event.currentTarget)}
             onKeyUp={(event) => updateCaret(event.currentTarget)}
             onKeyDown={handleKeyDown}
-            onFocus={() => setFocused(true)}
+            onFocus={() => {
+              setFocused(true)
+              setShouldLoadProfiles(true)
+            }}
             onBlur={() => window.setTimeout(() => setFocused(false), 120)}
             className={cn(
               "resize-none border-border/80 bg-background shadow-none",

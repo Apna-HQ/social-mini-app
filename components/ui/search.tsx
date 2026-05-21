@@ -1,10 +1,9 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from './button'
 import { nip19 } from 'nostr-tools'
-import { useApna } from '@/components/providers/ApnaProvider'
 import { UserProfileCard } from './user-profile-card'
 
 // List of suggested user npubs
@@ -16,39 +15,27 @@ const suggestedUserNpubs = [
   "npub1qny3tkh0acurzla8x3zy4nhrjz5zd8l9sy9jys09umwng00manysew95gx"
 ]
 
-export function Search() {
-  useApna()
-  const [suggestedUsers, setSuggestedUsers] = useState<Array<{
-    pubkey: string;
-    npub: string;
-    // metadata?: IUserMetadata;
-  }>>([])
-
-  // Fetch user profiles on component mount
-  useEffect(() => {
-    const fetchProfiles = async () => {
-      const users = await Promise.all(
-        suggestedUserNpubs.map(async (npub) => {
-          try {
-            const decoded = nip19.decode(npub)
-            if (decoded.type === 'npub') {
-              return {
-                pubkey: decoded.data,
-                npub,
-              }
-            }
-          } catch (e) {
-            console.error('Error fetching profile:', e)
-          }
-          return { pubkey: npub, npub }
-        })
-      )
-      setSuggestedUsers(users.filter(user => user !== undefined))
+const decodeSuggestedUser = (npub: string) => {
+  try {
+    const decoded = nip19.decode(npub)
+    if (decoded.type === 'npub') {
+      return {
+        pubkey: decoded.data,
+        npub,
+      }
     }
-    fetchProfiles()
-  }, [])
+  } catch (error) {
+    console.error('Error decoding suggested user:', error)
+  }
+  return { pubkey: npub, npub }
+}
 
+export function Search() {
   const router = useRouter()
+  const suggestedUsers = useMemo(
+    () => suggestedUserNpubs.map(decodeSuggestedUser),
+    []
+  )
   const [searchInput, setSearchInput] = useState('')
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState('')

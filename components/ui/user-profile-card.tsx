@@ -3,24 +3,13 @@
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarImage, AvatarFallback } from "./avatar"
 import { Button } from "./button"
-import { useEffect, useState, useRef } from "react"
 import { useApp } from "@/app/providers"
 import { useApna } from "@/components/providers/ApnaProvider"
 import { NpubDisplay } from "@/components/atoms/NpubDisplay"
 import { hexToNpub, trimNpub } from "@/lib/utils/nostr"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
 
 interface UserProfileCardProps {
-  pubkey: string
-}
-
-interface UserProfile {
-  metadata: {
-    name?: string
-    about?: string
-    picture?: string
-  }
-  followers: string[]
-  following: string[]
   pubkey: string
 }
 
@@ -30,47 +19,7 @@ export function UserProfileCard({
   const router = useRouter()
   const { profile } = useApp()
   const { social } = useApna()
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
-  const [isVisible, setIsVisible] = useState(false)
-  const cardRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setIsVisible(true)
-          observer.disconnect()
-        }
-      },
-      {
-        rootMargin: "100px" // Start loading when within 100px of viewport
-      }
-    )
-
-    if (cardRef.current) {
-      observer.observe(cardRef.current)
-    }
-
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    if (!isVisible || !social) return
-
-    const fetchData = async () => {
-      try {
-        const freshProfile = await social.v1.userProfile(pubkey)
-        setUserProfile({
-          ...freshProfile,
-          pubkey
-        })
-      } catch (error) {
-        console.error("Failed to fetch user data:", error)
-      }
-    }
-
-    fetchData()
-  }, [pubkey, social, isVisible])
+  const userProfile = useUserProfile(pubkey)
 
   const handleClick = () => {
     router.push(`/user/${pubkey}`)
@@ -78,31 +27,30 @@ export function UserProfileCard({
 
   const handleFollowToggle = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!social) return
+    if (!profile || !social) return
 
     try {
       if (profile?.following.includes(pubkey)) {
-        await social!.v1.unfollow(pubkey)
+        await social.v1.unfollow(pubkey)
       } else {
-        await social!.v1.follow(pubkey)
+        await social.v1.follow(pubkey)
       }
     } catch (error) {
       console.error("Failed to follow/unfollow user:", error)
     }
   }
 
-  const displayName = userProfile?.metadata.name || trimNpub(hexToNpub(pubkey), 4, 4)
-  const displayAbout = userProfile?.metadata.about
+  const displayName = userProfile.name || trimNpub(hexToNpub(pubkey), 4, 4)
+  const displayAbout = userProfile.about
 
   return (
     <div
-      ref={cardRef}
       className="flex items-center gap-4 p-4 rounded-lg border cursor-pointer hover:bg-accent/5"
       onClick={handleClick}
     >
       <Avatar className="w-12 h-12">
-        {userProfile?.metadata.picture ? (
-          <AvatarImage src={userProfile.metadata.picture} alt={displayName} />
+        {userProfile.picture ? (
+          <AvatarImage src={userProfile.picture} alt={displayName} />
         ) : (
           <AvatarFallback>
             {displayName[0].toUpperCase()}
