@@ -27,6 +27,7 @@ export function noteToPostProps(
       pubkey: note.pubkey,
     },
     timestamp: note.created_at,
+    tags: note.tags as string[][],
     isReply,
     parentNoteId,
   }

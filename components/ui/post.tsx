@@ -17,6 +17,7 @@ export interface PostProps {
     pubkey: string
   }
   timestamp: number
+  tags?: string[][]
   onHashtagClick?: (hashtag: string) => void
   isReply?: boolean
   parentNoteId?: string
@@ -28,6 +29,7 @@ export function Post({
   content,
   author,
   timestamp,
+  tags,
   onHashtagClick,
   parentNoteId,
   hideParentNote,
@@ -61,6 +63,7 @@ export function Post({
           content={
             <ContentRenderer
               content={content}
+              tags={tags}
               onHashtagClick={onHashtagClick}
               parentNoteId={parentNoteId}
               hideParentNote={hideParentNote}

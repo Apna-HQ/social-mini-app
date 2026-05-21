@@ -4,13 +4,26 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, useRef, useMemo } from "react"
 import type React from "react"
+import { nip19 } from "nostr-tools"
 import { Card, CardContent, CardHeader } from "./card"
 import { AuthorInfo } from "./author-info"
+import { Avatar, AvatarFallback, AvatarImage } from "./avatar"
 import { useApna } from "@/components/providers/ApnaProvider"
-import { trimNpub } from "@/lib/utils/nostr"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { hexToNpub, trimNpub } from "@/lib/utils/nostr"
 
 interface ContentSegment {
-  type: "text" | "nostr" | "profile" | "image" | "hashtag" | "youtube" | "url" | "audio" | "video"
+  type:
+    | "text"
+    | "nostr"
+    | "profile"
+    | "indexed-tag"
+    | "image"
+    | "hashtag"
+    | "youtube"
+    | "url"
+    | "audio"
+    | "video"
   content: string
 }
 
@@ -28,11 +41,13 @@ interface ContentRendererProps {
   parentNoteId?: string
   hideParentNote?: boolean
   mentions?: ContentMention[]
+  tags?: string[][]
 }
 
 interface ReferencedNote {
   id: string
   content: string
+  tags: string[][]
   author: {
     name?: string
     picture?: string
@@ -116,6 +131,7 @@ function parseContent(content: string): ContentSegment[] {
   // Regular expressions for different content types
   const nostrRegex = /nostr:([a-zA-Z0-9]+)/g;
   const imageRegex = /https?:\/\/\S+\.(jpg|jpeg|png|gif|webp)(\?\S*)?/gi;
+  const indexedTagRegex = /#\[\d+\]/g;
   const hashtagRegex = /#[a-zA-Z0-9_]+/g;
   const youtubeRegex = /(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/(watch\?v=|embed\/)?([a-zA-Z0-9_-]+)/gi;
   const audioRegex = /https?:\/\/\S+\.(mp3|wav|ogg)(\?\S*)?/gi;
@@ -124,7 +140,7 @@ function parseContent(content: string): ContentSegment[] {
 
   // Combined regex to match any of the above
   const combinedRegex = new RegExp(
-    `${nostrRegex.source}|${imageRegex.source}|${hashtagRegex.source}|${youtubeRegex.source}|${audioRegex.source}|${videoRegex.source}`,
+    `${nostrRegex.source}|${imageRegex.source}|${indexedTagRegex.source}|${hashtagRegex.source}|${youtubeRegex.source}|${audioRegex.source}|${videoRegex.source}`,
     "gi"
   )
 
@@ -144,10 +160,18 @@ function parseContent(content: string): ContentSegment[] {
         type: "nostr",
         content: matchedContent.slice(6) // Remove "nostr:" prefix
       })
-    } else if (matchedContent.startsWith("nostr:npub")) {
+    } else if (
+      matchedContent.startsWith("nostr:npub") ||
+      matchedContent.startsWith("nostr:nprofile")
+    ) {
       segments.push({
         type: "profile",
         content: matchedContent.slice(6)
+      })
+    } else if (matchedContent.startsWith("#[")) {
+      segments.push({
+        type: "indexed-tag",
+        content: matchedContent.slice(2, -1)
       })
     } else if (matchedContent.match(imageRegex)) {
       segments.push({
@@ -227,6 +251,7 @@ const ParentNote = ({ note }: { note: ReferencedNote }) => {
           content={
             <ContentRenderer
               content={note.content}
+              tags={note.tags}
               // No parentNoteId or hideParentNote props as per requirements
             />
           }
@@ -248,6 +273,7 @@ export function ContentRenderer({
   parentNoteId,
   hideParentNote,
   mentions = [],
+  tags = [],
 }: ContentRendererProps) {
   const router = useRouter()
   const apna = useApna()
@@ -257,13 +283,28 @@ export function ContentRenderer({
   const mentionLookup = useMemo(() => {
     const byHandle = new Map<string, ContentMention>()
     const byNpub = new Map<string, ContentMention>()
-    mentions.forEach((mention) => {
+    const byPubkey = new Map<string, ContentMention>()
+    const byTagIndex = new Map<number, ContentMention>()
+
+    const registerMention = (mention: ContentMention) => {
+      if (mention.pubkey) byPubkey.set(mention.pubkey.toLowerCase(), mention)
       const handle = (mention.handle || mention.name || "").replace(/^@/, "")
       if (handle) byHandle.set(handle.toLowerCase(), mention)
       if (mention.npub) byNpub.set(mention.npub.toLowerCase(), mention)
+    }
+
+    const tagMentions = profileTagMentions(tags)
+    tagMentions.forEach(({ mention }) => registerMention(mention))
+    mentions.forEach((mention) => registerMention(mention))
+    tagMentions.forEach(({ index, mention }) => {
+      byTagIndex.set(
+        index,
+        byPubkey.get(mention.pubkey.toLowerCase()) || mention
+      )
     })
-    return { byHandle, byNpub }
-  }, [mentions])
+
+    return { byHandle, byNpub, byPubkey, byTagIndex }
+  }, [mentions, tags])
 
   // Fetch parent note if parentNoteId is provided
   useEffect(() => {
@@ -276,6 +317,7 @@ export function ContentRenderer({
           setParentNote({
             id: note.id,
             content: note.content,
+            tags: note.tags || [],
             author: {
               pubkey: note.pubkey,
               // Additional metadata could be fetched here if needed
@@ -306,6 +348,7 @@ export function ContentRenderer({
             fetchedNotes[noteId] = {
               id: note.id,
               content: note.content,
+              tags: note.tags || [],
               author: {
                 pubkey: note.pubkey,
                 // Additional metadata could be fetched here if needed
@@ -347,10 +390,24 @@ export function ContentRenderer({
           case "profile":
             return renderProfileMention(
               segment.content,
-              mentionLookup.byNpub,
+              mentionLookup,
               router,
               index
             )
+
+          case "indexed-tag": {
+            const tagMention = mentionLookup.byTagIndex.get(Number(segment.content))
+            if (!tagMention) return <span key={index}>{`#[${segment.content}]`}</span>
+
+            return (
+              <AccountMention
+                key={index}
+                mention={tagMention}
+                router={router}
+                title={`#[${segment.content}]`}
+              />
+            )
+          }
 
           case "nostr": {
             const referencedNote = referencedNotes[segment.content]
@@ -370,9 +427,13 @@ export function ContentRenderer({
                   />
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm line-clamp-3 whitespace-pre-wrap break-words">
-                    {referencedNote.content}
-                  </p>
+                  <div className="text-sm line-clamp-3 whitespace-pre-wrap break-words">
+                    <ContentRenderer
+                      content={referencedNote.content}
+                      tags={referencedNote.tags}
+                      hideParentNote
+                    />
+                  </div>
                 </CardContent>
               </Card>
             )
@@ -453,17 +514,12 @@ function renderTextWithMentions(
     }
 
     parts.push(
-      <button
+      <AccountMention
         key={`${mention.pubkey}-${mentionStart}`}
-        type="button"
-        className="inline-flex items-center rounded-md bg-secondary px-1.5 py-0.5 font-medium text-secondary-foreground transition-colors hover:bg-accent"
-        onClick={(event) => {
-          event.stopPropagation()
-          router.push(`/user/${mention.pubkey}`)
-        }}
-      >
-        @{handle}
-      </button>
+        mention={mention}
+        router={router}
+        title={`@${handle}`}
+      />
     )
 
     currentIndex = match.index + fullMatch.length
@@ -475,29 +531,137 @@ function renderTextWithMentions(
 }
 
 function renderProfileMention(
-  npub: string,
-  mentionsByNpub: Map<string, ContentMention>,
+  reference: string,
+  mentionLookup: {
+    byNpub: Map<string, ContentMention>
+    byPubkey: Map<string, ContentMention>
+  },
   router: ReturnType<typeof useRouter>,
   key: React.Key
 ) {
-  const mention = mentionsByNpub.get(npub.toLowerCase())
-  const label = mention
-    ? `@${mention.handle || mention.name}`
-    : `@${trimNpub(npub, 8, 4)}`
-  const target = mention?.pubkey || npub
+  const resolved = resolveProfileReference(reference, mentionLookup)
+
+  return (
+    <AccountMention
+      key={key}
+      mention={resolved.mention}
+      npub={resolved.npub}
+      pubkey={resolved.pubkey}
+      router={router}
+      title={`nostr:${reference}`}
+    />
+  )
+}
+
+function AccountMention({
+  mention,
+  npub,
+  pubkey,
+  router,
+  title,
+}: {
+  mention?: ContentMention
+  npub?: string
+  pubkey?: string
+  router: ReturnType<typeof useRouter>
+  title?: string
+}) {
+  const target = mention?.pubkey || pubkey || npub || ""
+  const profile = useUserProfile(mention?.pubkey || pubkey || npub || "")
+  const resolvedNpub =
+    mention?.npub || npub || (pubkey ? hexToNpub(pubkey) : undefined)
+  const fallback = resolvedNpub ? trimNpub(resolvedNpub, 8, 4) : "account"
+  const displayName = mention?.name || profile.name || fallback
+  const picture = mention?.picture || profile.picture
+  const initial = displayName.trim().charAt(0).toUpperCase() || "U"
 
   return (
     <button
-      key={key}
       type="button"
-      title={`nostr:${npub}`}
-      className="inline-flex items-center rounded-md bg-secondary px-1.5 py-0.5 font-medium text-secondary-foreground transition-colors hover:bg-accent"
+      title={title || (resolvedNpub ? `nostr:${resolvedNpub}` : undefined)}
+      className="mx-0.5 inline-flex max-w-[14rem] items-center gap-1.5 rounded-full border border-border/80 bg-secondary/70 px-1.5 py-0.5 align-middle text-sm font-medium text-secondary-foreground transition-colors hover:border-primary/30 hover:bg-accent/70"
       onClick={(event) => {
         event.stopPropagation()
-        router.push(`/user/${target}`)
+        if (target) router.push(`/user/${target}`)
       }}
     >
-      {label}
+      <Avatar className="h-5 w-5 border border-background">
+        <AvatarImage src={picture} alt="" />
+        <AvatarFallback className="text-[10px]">{initial}</AvatarFallback>
+      </Avatar>
+      <span className="min-w-0 truncate">{displayName}</span>
     </button>
   )
+}
+
+function profileTagMentions(
+  tags: string[][]
+): Array<{ index: number; mention: ContentMention }> {
+  return tags.flatMap((tag, index) => {
+    const pubkey = tag[0] === "p" ? tag[1] : undefined
+    if (!pubkey || !isProfilePubkey(pubkey)) return []
+
+    return [
+      {
+        index,
+        mention: {
+          pubkey,
+          npub: pubkey.startsWith("npub") ? pubkey : hexToNpub(pubkey),
+          name: "",
+        },
+      },
+    ]
+  })
+}
+
+function resolveProfileReference(
+  reference: string,
+  mentionLookup: {
+    byNpub: Map<string, ContentMention>
+    byPubkey: Map<string, ContentMention>
+  }
+): { mention?: ContentMention; npub?: string; pubkey?: string } {
+  const directMention = mentionLookup.byNpub.get(reference.toLowerCase())
+  if (directMention) {
+    return {
+      mention: directMention,
+      npub: directMention.npub || reference,
+      pubkey: directMention.pubkey,
+    }
+  }
+
+  const decoded = decodeProfileReference(reference)
+  const mention = decoded.pubkey
+    ? mentionLookup.byPubkey.get(decoded.pubkey.toLowerCase())
+    : undefined
+
+  return {
+    mention,
+    npub: mention?.npub || decoded.npub,
+    pubkey: mention?.pubkey || decoded.pubkey,
+  }
+}
+
+function decodeProfileReference(
+  reference: string
+): { npub?: string; pubkey?: string } {
+  try {
+    const decoded = nip19.decode(reference)
+    if (decoded.type === "npub" && typeof decoded.data === "string") {
+      return { npub: reference, pubkey: decoded.data }
+    }
+
+    if (decoded.type === "nprofile") {
+      const data = decoded.data as { pubkey?: string }
+      if (data.pubkey) return { npub: hexToNpub(data.pubkey), pubkey: data.pubkey }
+    }
+  } catch {
+    // Keep rendering a readable fallback when an account reference is malformed.
+  }
+
+  return reference.startsWith("npub") ? { npub: reference } : {}
+}
+
+function isProfilePubkey(pubkey: string): boolean {
+  return /^[0-9a-f]{64}$/i.test(pubkey) || pubkey.startsWith("npub")
 }

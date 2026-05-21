@@ -36,8 +36,11 @@ export function useUserProfile(pubkey: string): UserProfile {
       // userMetadata fetches only kind-0 (avatar/name) instead of the
       // full profile (which also pulls followers — much heavier).
       const meta = (await apna.social!.v1.userMetadata(pubkey).catch(() => ({}))) || {}
+      const displayName =
+        (meta as { display_name?: string }).display_name ||
+        (meta as { name?: string }).name
       const next: UserProfile = {
-        name: (meta as { name?: string }).name,
+        name: displayName,
         picture: (meta as { picture?: string }).picture,
         pubkey,
       }
