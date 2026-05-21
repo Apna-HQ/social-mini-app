@@ -4,6 +4,7 @@ import { AppProvider } from "./providers"
 import { Nav } from "@/components/ui/nav"
 import "./globals.css"
 import { ApnaProvider } from "@/components/providers/ApnaProvider"
+import { ComposeProvider } from "@/components/ui/global-compose"
 import { Suspense } from "react"
 
 export default function RootLayout({
@@ -21,10 +22,12 @@ export default function RootLayout({
             </div>
           }>
             <AppProvider>
-              {children}
-              <Nav />
-              {/* Add padding to account for fixed nav */}
-              <div className="pb-16" />
+              <ComposeProvider>
+                {children}
+                <Nav />
+                {/* Add padding to account for fixed nav */}
+                <div className="pb-16" />
+              </ComposeProvider>
             </AppProvider>
           </Suspense>
         </ApnaProvider>

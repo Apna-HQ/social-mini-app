@@ -8,7 +8,6 @@ import type { ApnaSocialDomain, INote, UserMetadata } from "@apna/sdk"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Fab } from "@/components/ui/fab"
 import type { ComposerPublishHandler } from "@/components/ui/note-composer"
 import { Post } from "@/components/ui/post"
 import { RailCard, SocialHeader, SocialLayout } from "@/components/ui/social-layout"
@@ -68,14 +67,12 @@ export function ProfileTemplate({
   showBackButton = false,
   showEditProfile = false,
   showFollowButton = false,
-  showFab = false,
   isEditing = false,
   editForm = {},
   onEditStart,
   onEditSave,
   onEditCancel,
   onFollowToggle,
-  onPublishNote,
   social,
 }: ProfileTemplateProps) {
   const router = useRouter()
@@ -359,7 +356,6 @@ export function ProfileTemplate({
         </Tabs>
       </SocialLayout>
 
-      {showFab && onPublishNote && <Fab onPublish={onPublishNote} />}
     </>
   )
 }

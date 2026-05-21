@@ -1,32 +1,32 @@
 "use client"
 
-import React, { useState } from "react"
+import React from "react"
 import { Loader2, RefreshCcw, Rss, Wifi } from "lucide-react"
 import type { INote } from "@apna/sdk"
 
 import { useApp } from "./providers"
 import { useFeed } from "@/hooks/useFeed"
 import { Post } from "@/components/ui/post"
-import { Fab } from "@/components/ui/fab"
 import { Button } from "@/components/ui/button"
-import { CreateNoteModal } from "@/components/ui/create-note-modal"
 import { NoteComposer, type ComposerPublishHandler } from "@/components/ui/note-composer"
+import { useComposer } from "@/components/ui/global-compose"
 import { RailCard, SocialHeader, SocialLayout } from "@/components/ui/social-layout"
 import { noteToPostProps } from "@/lib/utils/post"
 
 export default function Home() {
-  const [composerOpen, setComposerOpen] = useState(false)
   const { notes, loading, loadingMore, refreshing, error, loadMore, refreshFeed } = useFeed()
   const { publishNote, profile } = useApp()
+  const { openComposer } = useComposer()
 
   const handlePublish: ComposerPublishHandler = async (content, options) => {
     await publishNote(content, options)
     void refreshFeed()
   }
+  const openHomeComposer = () => openComposer({ onPublished: refreshFeed })
 
   return (
     <>
-      <SocialLayout onCompose={() => setComposerOpen(true)} rightRail={<HomeRail notes={notes.length} />}>
+      <SocialLayout onCompose={openHomeComposer} rightRail={<HomeRail notes={notes.length} />}>
         <SocialHeader
           title="Home"
           subtitle={notes.length ? `${notes.length} notes and replies` : "following feed"}
@@ -74,13 +74,6 @@ export default function Home() {
           onLoadMore={loadMore}
         />
       </SocialLayout>
-
-      <Fab onClick={() => setComposerOpen(true)} />
-      <CreateNoteModal
-        isOpen={composerOpen}
-        onClose={() => setComposerOpen(false)}
-        onPublish={handlePublish}
-      />
     </>
   )
 }

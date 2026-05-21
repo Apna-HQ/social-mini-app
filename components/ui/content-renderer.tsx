@@ -3,6 +3,7 @@
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, useRef, useMemo } from "react"
+import type React from "react"
 import { Card, CardContent, CardHeader } from "./card"
 import { AuthorInfo } from "./author-info"
 import { useApna } from "@/components/providers/ApnaProvider"
@@ -12,11 +13,19 @@ interface ContentSegment {
   content: string
 }
 
+export interface ContentMention {
+  pubkey: string
+  name: string
+  handle?: string
+  picture?: string
+}
+
 interface ContentRendererProps {
   content: string
   onHashtagClick?: (hashtag: string) => void
   parentNoteId?: string
   hideParentNote?: boolean
+  mentions?: ContentMention[]
 }
 
 interface ReferencedNote {
@@ -226,12 +235,26 @@ const ParentNote = ({ note }: { note: ReferencedNote }) => {
   )
 }
 
-export function ContentRenderer({ content, onHashtagClick, parentNoteId, hideParentNote }: ContentRendererProps) {
+export function ContentRenderer({
+  content,
+  onHashtagClick,
+  parentNoteId,
+  hideParentNote,
+  mentions = [],
+}: ContentRendererProps) {
   const router = useRouter()
   const apna = useApna()
   const [referencedNotes, setReferencedNotes] = useState<{ [key: string]: ReferencedNote }>({})
   const [parentNote, setParentNote] = useState<ReferencedNote | null>(null)
   const segments = useMemo(() => parseContent(content), [content])
+  const mentionsByHandle = useMemo(() => {
+    const map = new Map<string, ContentMention>()
+    mentions.forEach((mention) => {
+      const handle = (mention.handle || mention.name || "").replace(/^@/, "")
+      if (handle) map.set(handle.toLowerCase(), mention)
+    })
+    return map
+  }, [mentions])
 
   // Fetch parent note if parentNoteId is provided
   useEffect(() => {
@@ -295,7 +318,7 @@ export function ContentRenderer({ content, onHashtagClick, parentNoteId, hidePar
   }, [content, apna, segments])
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 whitespace-pre-wrap break-words">
       {/* Render parent note if it exists and is not hidden */}
       {parentNote && !hideParentNote && (
         <div className="mb-4 border-b pb-4">
@@ -306,7 +329,11 @@ export function ContentRenderer({ content, onHashtagClick, parentNoteId, hidePar
       {segments.map((segment, index) => {
         switch (segment.type) {
           case "text":
-            return <span key={index}>{segment.content}</span>
+            return (
+              <span key={index}>
+                {renderTextWithMentions(segment.content, mentionsByHandle, router)}
+              </span>
+            )
 
           case "nostr": {
             const referencedNote = referencedNotes[segment.content]
@@ -335,7 +362,6 @@ export function ContentRenderer({ content, onHashtagClick, parentNoteId, hidePar
           }
 
           case "image": {
-            const isProfilePic = segment.content.includes("github.com/shadcn.png")
             return (
               <div key={index}
                 className={`relative rounded-lg overflow-hidden bg-muted`}
@@ -382,4 +408,51 @@ export function ContentRenderer({ content, onHashtagClick, parentNoteId, hidePar
       })}
     </div>
   )
+}
+
+function renderTextWithMentions(
+  text: string,
+  mentionsByHandle: Map<string, ContentMention>,
+  router: ReturnType<typeof useRouter>
+) {
+  if (mentionsByHandle.size === 0) return text
+
+  const parts: React.ReactNode[] = []
+  const mentionRegex = /(^|[^\w])@([A-Za-z0-9_.-]{2,32})/g
+  let currentIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = mentionRegex.exec(text)) !== null) {
+    const fullMatch = match[0]
+    const prefix = match[1] || ""
+    const handle = match[2]
+    const mention = mentionsByHandle.get(handle.toLowerCase())
+
+    if (!mention) continue
+
+    const mentionStart = match.index + prefix.length
+    if (mentionStart > currentIndex) {
+      parts.push(text.slice(currentIndex, mentionStart))
+    }
+
+    parts.push(
+      <button
+        key={`${mention.pubkey}-${mentionStart}`}
+        type="button"
+        className="inline-flex items-center rounded-md bg-secondary px-1.5 py-0.5 font-medium text-secondary-foreground transition-colors hover:bg-accent"
+        onClick={(event) => {
+          event.stopPropagation()
+          router.push(`/user/${mention.pubkey}`)
+        }}
+      >
+        @{handle}
+      </button>
+    )
+
+    currentIndex = match.index + fullMatch.length
+  }
+
+  if (currentIndex === 0) return text
+  if (currentIndex < text.length) parts.push(text.slice(currentIndex))
+  return parts
 }

@@ -7,7 +7,7 @@ import { ProfileTemplate, UserProfile } from "@/components/templates/ProfileTemp
 import type { UserMetadata } from "@apna/sdk"
 
 export default function ProfilePage() {
-  const { profile: appProfile, updateProfileMetadata, publishNote } = useApp()
+  const { profile: appProfile, updateProfileMetadata } = useApp()
   const { social } = useApna()
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -94,13 +94,11 @@ export default function ProfilePage() {
       userProfile={userProfile}
       isCurrentUser={true}
       showEditProfile={true}
-      showFab={true}
       isEditing={isEditing}
       editForm={editForm}
       onEditStart={handleEditStart}
       onEditSave={handleEditSave}
       onEditCancel={handleEditCancel}
-      onPublishNote={publishNote}
       social={social}
     />
   )

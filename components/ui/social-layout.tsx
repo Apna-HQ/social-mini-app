@@ -5,6 +5,7 @@ import { Bell, Home, Mail, Plus, Search, User } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { useComposer } from "@/components/ui/global-compose"
 import { cn } from "@/lib/utils"
 
 const navItems: Array<{
@@ -89,6 +90,8 @@ export function RailCard({
 function SocialSidebar({ onCompose }: { onCompose?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { openComposer } = useComposer()
+  const handleCompose = onCompose ?? (() => openComposer())
 
   return (
     <aside className="sticky top-0 hidden h-screen border-r border-border/80 bg-background px-3 py-5 md:block">
@@ -133,7 +136,7 @@ function SocialSidebar({ onCompose }: { onCompose?: () => void }) {
 
       <Button
         className="mt-5 w-full rounded-lg"
-        onClick={() => (onCompose ? onCompose() : router.push("/"))}
+        onClick={handleCompose}
       >
         <Plus className="mr-2 h-4 w-4" />
         Compose

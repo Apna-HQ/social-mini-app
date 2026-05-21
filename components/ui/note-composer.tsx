@@ -16,6 +16,7 @@ import type { ApnaSocialDomain, UserMetadata, UserProfile } from "@apna/sdk"
 import { ApnaContext } from "@/components/providers/ApnaProvider"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { ContentRenderer } from "@/components/ui/content-renderer"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { hexToNpub, trimNpub } from "@/lib/utils/nostr"
@@ -24,6 +25,7 @@ export interface ComposerMention {
   pubkey: string
   npub?: string
   name: string
+  handle?: string
   picture?: string
 }
 
@@ -116,6 +118,8 @@ export function NoteComposer({
   const [caret, setCaret] = useState(0)
   const [focused, setFocused] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [publishProgress, setPublishProgress] = useState(0)
+  const [publishStage, setPublishStage] = useState("")
   const [uploadingImage, setUploadingImage] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploadedImages, setUploadedImages] = useState<string[]>([])
@@ -200,6 +204,10 @@ export function NoteComposer({
   }, [activeToken, mentionMap, profiles])
 
   const showSuggestions = focused && !!activeToken && suggestions.length > 0
+  const previewMentions = useMemo(
+    () => Array.from(mentionMap.values()),
+    [mentionMap]
+  )
 
   const addMention = useCallback((candidate: ComposerMention) => {
     setMentionMap((current) => {
@@ -303,9 +311,21 @@ export function NoteComposer({
     if (!trimmed || publishing) return
 
     setPublishing(true)
+    setPublishProgress(12)
+    setPublishStage("Preparing")
     setError(null)
+    const progressTimer = window.setInterval(() => {
+      setPublishProgress((current) => {
+        if (current >= 88) return current
+        return Math.min(88, current + Math.max(3, (88 - current) * 0.16))
+      })
+    }, 140)
+
     try {
+      setPublishStage("Publishing")
       await onPublish(trimmed, buildPublishOptions())
+      setPublishProgress(100)
+      setPublishStage("Published")
       setContent("")
       setMentionMap(new Map())
       setUploadedImages([])
@@ -313,8 +333,14 @@ export function NoteComposer({
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : String(caught)
       setError(message || "Could not publish")
+      setPublishStage("Failed")
     } finally {
-      setPublishing(false)
+      window.clearInterval(progressTimer)
+      window.setTimeout(() => {
+        setPublishing(false)
+        setPublishProgress(0)
+        setPublishStage("")
+      }, 350)
     }
   }
 
@@ -436,6 +462,44 @@ export function NoteComposer({
           <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
             {error}
           </p>
+        )}
+
+        {content.trim() && (
+          <div className="rounded-lg border border-border/80 bg-secondary/25 p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <span className="font-mono text-[11px] uppercase text-muted-foreground">
+                Preview
+              </span>
+              {previewMentions.length > 0 && (
+                <span className="truncate font-mono text-[11px] text-muted-foreground">
+                  {previewMentions.length} tag
+                  {previewMentions.length === 1 ? "" : "s"}
+                </span>
+              )}
+            </div>
+            <div className="rounded-md bg-background px-3 py-2 text-sm">
+              <ContentRenderer
+                content={content}
+                mentions={previewMentions}
+                hideParentNote
+              />
+            </div>
+          </div>
+        )}
+
+        {publishing && (
+          <div className="space-y-1">
+            <div className="h-1.5 overflow-hidden rounded-full bg-secondary">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-150 ease-out"
+                style={{ width: `${publishProgress}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between font-mono text-[11px] text-muted-foreground">
+              <span>{publishStage}</span>
+              <span>{Math.round(publishProgress)}%</span>
+            </div>
+          </div>
         )}
 
         <div className="flex items-center justify-between gap-3">

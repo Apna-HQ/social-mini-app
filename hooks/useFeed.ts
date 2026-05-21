@@ -280,6 +280,28 @@ export function useFeed(): UseFeedResult {
     return unsubscribe;
   }, [apna.social, mergeNotes, userPubkey]);
 
+  useEffect(() => {
+    if (!userPubkey || typeof window === "undefined") return;
+
+    const handlePublished = (event: Event) => {
+      const note = (event as CustomEvent<INote | void>).detail;
+      if (!note || note.kind !== 1) return;
+
+      mergeNotes([note]);
+      void feedDB.addNotes(userPubkey, [{
+        id: note.id,
+        content: note.content,
+        pubkey: note.pubkey,
+        created_at: note.created_at,
+        tags: note.tags as string[][],
+        sig: note.sig,
+      }]);
+    };
+
+    window.addEventListener("social:note-published", handlePublished);
+    return () => window.removeEventListener("social:note-published", handlePublished);
+  }, [mergeNotes, userPubkey]);
+
 // Removed useEffect that updated lastTimestamp
 
 
