@@ -579,7 +579,7 @@ function AccountMention({
     <button
       type="button"
       title={title || (resolvedNpub ? `nostr:${resolvedNpub}` : undefined)}
-      className="mx-0.5 inline-flex max-w-[14rem] items-center gap-1.5 rounded-full border border-border/80 bg-secondary/70 px-1.5 py-0.5 align-[0.12em] text-sm font-medium leading-none text-secondary-foreground transition-colors hover:border-primary/30 hover:bg-accent/70"
+      className="mx-0.5 inline-flex max-w-[14rem] items-center gap-1.5 rounded-full border border-border/80 bg-secondary/70 px-1.5 py-0.5 align-middle text-sm font-medium leading-none text-secondary-foreground transition-colors hover:border-primary/30 hover:bg-accent/70"
       onClick={(event) => {
         event.stopPropagation()
         if (target) router.push(`/user/${target}`)
